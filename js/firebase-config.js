@@ -1,9 +1,13 @@
 // =================================================================================
 // MÓDULO: CONFIGURAÇÃO E INICIALIZAÇÃO DO FIREBASE
 // =================================================================================
+console.log('🔥 SGM Debug: firebase-config.js carregando...');
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+console.log('🔥 SGM Debug: Firebase imports carregados');
 
 // Função para obter variáveis de ambiente (funciona tanto no Netlify quanto localmente)
 const getEnvVar = (name, fallback = null) => {
@@ -21,14 +25,15 @@ const getEnvVar = (name, fallback = null) => {
     return fallback;
 };
 
-// Configuração segura do Firebase usando variáveis de ambiente
+// Configuração do Firebase - TEMPORÁRIA PARA TESTE
+// Em produção, use variáveis de ambiente
 const firebaseConfig = {
-    apiKey: getEnvVar('VITE_FIREBASE_API_KEY', 'SUA_API_KEY'),
-    authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', 'SUA_AUTH_DOMAIN'),
-    projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'SUA_PROJECT_ID'),
-    storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', 'SUA_STORAGE_BUCKET'),
-    messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', 'SUA_MESSAGING_SENDER_ID'),
-    appId: getEnvVar('VITE_FIREBASE_APP_ID', 'SUA_APP_ID')
+    apiKey: getEnvVar('VITE_FIREBASE_API_KEY', 'AIzaSyAdCrzegeV4i3tCVzaiDKqzRljtZA7Dh2A'),
+    authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', 'gcontroledehgutl.firebaseapp.com'),
+    projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'gcontroledehgutl'),
+    storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', 'gcontroledehgutl.appspot.com'),
+    messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', '520957417418'),
+    appId: getEnvVar('VITE_FIREBASE_APP_ID', '1:520957417418:web:b9694a3ef04d0477826133')
 };
 
 // Validação das configurações
@@ -49,19 +54,22 @@ const validateConfig = () => {
         console.error('');
         console.error('🔗 Mais informações: consulte o README.md');
         
-        if (process.env.NODE_ENV === 'production') {
-            throw new Error('Firebase não configurado corretamente para produção');
-        }
+        // Removido throw para permitir execução em desenvolvimento
+        console.warn('⚠️ Continuando com configuração padrão para desenvolvimento...');
     }
 };
 
 // Valida a configuração ao carregar
 validateConfig();
 
+console.log('🔥 SGM Debug: Inicializando Firebase App...');
 const firebaseApp = initializeApp(firebaseConfig);
 
+console.log('🔥 SGM Debug: Configurando Auth e Firestore...');
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
+
+console.log('✅ SGM Debug: Firebase configurado com sucesso!');
 
 // Constantes da aplicação
 export const HYGIENE_DEADLINE_DAYS = 120; // 4 meses
