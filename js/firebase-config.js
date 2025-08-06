@@ -5,30 +5,58 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// IMPORTANTE: Para produção no Netlify, configure estas variáveis como variáveis de ambiente:
-// VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, etc.
-// e substitua os valores abaixo por process.env.VITE_FIREBASE_API_KEY, etc.
-const firebaseConfig = {
-    apiKey: "SUA_API_KEY", // Substituir por variável de ambiente no Netlify
-    authDomain: "SUA_AUTH_DOMAIN", // Substituir por variável de ambiente no Netlify
-    projectId: "SUA_PROJECT_ID", // Substituir por variável de ambiente no Netlify
-    storageBucket: "SUA_STORAGE_BUCKET", // Substituir por variável de ambiente no Netlify
-    messagingSenderId: "SUA_MESSAGING_SENDER_ID", // Substituir por variável de ambiente no Netlify
-    appId: "SUA_APP_ID" // Substituir por variável de ambiente no Netlify
+// Função para obter variáveis de ambiente (funciona tanto no Netlify quanto localmente)
+const getEnvVar = (name, fallback = null) => {
+    // No Netlify, as variáveis são injetadas globalmente em import.meta.env
+    if (typeof import !== 'undefined' && import.meta && import.meta.env) {
+        return import.meta.env[name] || fallback;
+    }
+    
+    // Para desenvolvimento local sem build tool, pode usar um objeto global
+    if (typeof window !== 'undefined' && window.ENV) {
+        return window.ENV[name] || fallback;
+    }
+    
+    // Fallback para desenvolvimento
+    return fallback;
 };
 
-// Para desenvolvimento local, você pode usar os valores reais temporariamente:
-// Descomente as linhas abaixo e comente o objeto acima para desenvolvimento local
-/*
+// Configuração segura do Firebase usando variáveis de ambiente
 const firebaseConfig = {
-    apiKey: "AIzaSyAdCrzegeV4i3tCVzaiDKqzRljtZA7Dh2A",
-    authDomain: "gcontroledehgutl.firebaseapp.com",
-    projectId: "gcontroledehgutl",
-    storageBucket: "gcontroledehgutl.appspot.com",
-    messagingSenderId: "520957417418",
-    appId: "1:520957417418:web:b9694a3ef04d0477826133"
+    apiKey: getEnvVar('VITE_FIREBASE_API_KEY', 'SUA_API_KEY'),
+    authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', 'SUA_AUTH_DOMAIN'),
+    projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'SUA_PROJECT_ID'),
+    storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', 'SUA_STORAGE_BUCKET'),
+    messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', 'SUA_MESSAGING_SENDER_ID'),
+    appId: getEnvVar('VITE_FIREBASE_APP_ID', 'SUA_APP_ID')
 };
-*/
+
+// Validação das configurações
+const validateConfig = () => {
+    const requiredVars = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+    const missingVars = requiredVars.filter(key => 
+        !firebaseConfig[key] || firebaseConfig[key].startsWith('SUA_')
+    );
+    
+    if (missingVars.length > 0) {
+        console.error('⚠️ CONFIGURAÇÃO FIREBASE INCOMPLETA!');
+        console.error('Variáveis não configuradas:', missingVars);
+        console.error('');
+        console.error('📋 INSTRUÇÕES:');
+        console.error('1. Copie o arquivo env.example para .env');
+        console.error('2. Preencha as variáveis com suas credenciais do Firebase');
+        console.error('3. Para Netlify, configure as variáveis no painel de ambiente');
+        console.error('');
+        console.error('🔗 Mais informações: consulte o README.md');
+        
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('Firebase não configurado corretamente para produção');
+        }
+    }
+};
+
+// Valida a configuração ao carregar
+validateConfig();
 
 const firebaseApp = initializeApp(firebaseConfig);
 
