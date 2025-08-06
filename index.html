@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.G.M - Sistema de Gestão de Máscaras</title>
+    <meta name="theme-color" content="#3b82f6">
+
+    <!-- CSP Corrigido para Publicação -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self'; 
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://www.gstatic.com;
+        style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+        connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;
+        worker-src 'self' data: blob:;
+        img-src 'self' https: data:;
+        font-src 'self' https://cdnjs.cloudflare.com;
+        frame-src 'self' https://*.firebaseapp.com;
+    ">
+
+    <!-- Dependências Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/dexie@3/dist/dexie.js"></script>
+
+    <!-- CSS customizado -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app" class="flex-grow"></div>
+    
+    <footer class="bg-gray-800 text-white text-center p-4 text-sm flex justify-between items-center">
+        <span id="footer-text"></span>
+        <button id="btn-feedback" class="text-xs text-gray-400 hover:text-white underline">Enviar Feedback</button>
+    </footer>
+
+    <!-- Elementos Flutuantes e Modais -->
+    <div id="fab-container">
+        <div id="assistant-fab" class="fab" title="Assistente C.J.7"><i class="fas fa-robot"></i></div>
+    </div>
+
+    <div id="toast-notification" class="fixed top-5 right-5 bg-green-100 border-green-400 text-green-700 px-6 py-4 rounded-lg shadow-lg z-[2000] flex items-center gap-3" style="display: none;">
+        <i id="toast-icon" class="fas fa-check-circle"></i>
+        <span id="toast-message"></span>
+    </div>
+
+    <div id="connection-status"></div>
+    <div id="modal-container"></div>
+
+    <!-- JavaScript principal -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
