@@ -1,18 +1,14 @@
 // =================================================================================
 // MÓDULO: CONFIGURAÇÃO E INICIALIZAÇÃO DO FIREBASE
 // =================================================================================
-console.log('🔥 SGM Debug: firebase-config.js carregando...');
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-console.log('🔥 SGM Debug: Firebase imports carregados');
-
 // Função para obter variáveis de ambiente (funciona tanto no Netlify quanto localmente)
 const getEnvVar = (name, fallback = null) => {
     // No Netlify, as variáveis são injetadas globalmente em import.meta.env
-    if (typeof import !== 'undefined' && import.meta && import.meta.env) {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
         return import.meta.env[name] || fallback;
     }
     
@@ -62,14 +58,10 @@ const validateConfig = () => {
 // Valida a configuração ao carregar
 validateConfig();
 
-console.log('🔥 SGM Debug: Inicializando Firebase App...');
 const firebaseApp = initializeApp(firebaseConfig);
 
-console.log('🔥 SGM Debug: Configurando Auth e Firestore...');
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
-
-console.log('✅ SGM Debug: Firebase configurado com sucesso!');
 
 // Constantes da aplicação
 export const HYGIENE_DEADLINE_DAYS = 120; // 4 meses

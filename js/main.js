@@ -313,14 +313,6 @@ window.App = App;
 // =================================================================================
 // INICIALIZAÇÃO DA APLICAÇÃO
 // =================================================================================
-console.log('🚀 SGM Debug: main.js carregado');
-
 window.addEventListener('load', () => {
-    console.log('🚀 SGM Debug: Window load event');
-    try {
-        App.init();
-        console.log('✅ SGM Debug: App.init() executado');
-    } catch (error) {
-        console.error('❌ SGM Debug: Erro na inicialização:', error);
-    }
+    App.init();
 });

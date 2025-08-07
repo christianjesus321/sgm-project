@@ -1,0 +1,5 @@
+# Configuração mínima para Netlify - SGM
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
