@@ -236,9 +236,9 @@ export const Views = {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div class="flex space-x-2">
-                                            <button class="text-green-600 hover:text-green-900"><i class="fas fa-plus"></i></button>
-                                            <button class="text-blue-600 hover:text-blue-900"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
+                                            <button class="btn-add text-green-600 hover:text-green-900" title="Adicionar ao estoque"><i class="fas fa-plus"></i></button>
+                                            <button class="btn-edit text-blue-600 hover:text-blue-900" title="Editar item"><i class="fas fa-edit"></i></button>
+                                            <button class="btn-delete text-red-600 hover:text-red-900" title="Excluir item"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -296,11 +296,11 @@ export const Views = {
                     <h1 class="text-2xl font-bold text-gray-800">Cadastros</h1>
                     <div class="bg-white rounded-lg shadow-sm border p-6">
                         <h2 class="text-lg font-semibold mb-4">Cadastrar Novo Usuário</h2>
-                        <form class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
-                                <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            </div>
+                                                 <form id="user-registration-form" class="space-y-4">
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+                                 <input type="text" id="user-name" name="nome" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required>
+                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Tamanho da Máscara</label>
@@ -405,10 +405,10 @@ export const Views = {
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div class="flex space-x-2">
-                                            <button class="text-blue-600 hover:text-blue-900"><i class="fas fa-sync-alt"></i></button>
-                                            <button class="text-green-600 hover:text-green-900"><i class="fas fa-th"></i></button>
-                                            <button class="text-yellow-600 hover:text-yellow-900"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
+                                            <button class="text-blue-600 hover:text-blue-900" title="Sincronizar"><i class="fas fa-sync-alt"></i></button>
+                                            <button class="text-green-600 hover:text-green-900" title="Ver detalhes"><i class="fas fa-th"></i></button>
+                                            <button class="btn-edit text-yellow-600 hover:text-yellow-900" title="Editar usuário"><i class="fas fa-edit"></i></button>
+                                            <button class="btn-delete text-red-600 hover:text-red-900" title="Excluir usuário"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -481,27 +481,39 @@ export const Views = {
                 <div class="space-y-6">
                     <h1 class="text-2xl font-bold text-gray-800">Relatórios</h1>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="bg-white rounded-lg shadow-sm border p-6">
-                            <h3 class="text-lg font-semibold mb-4">Relatório de Higienizações</h3>
-                            <div class="flex space-x-2">
-                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
-                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-sm border p-6">
-                            <h3 class="text-lg font-semibold mb-4">Relatório de Estoque</h3>
-                            <div class="flex space-x-2">
-                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
-                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-sm border p-6">
-                            <h3 class="text-lg font-semibold mb-4">Relatório de Usuários</h3>
-                            <div class="flex space-x-2">
-                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
-                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
-                            </div>
-                        </div>
+                                                 <div class="bg-white rounded-lg shadow-sm border p-6">
+                             <h3 class="text-lg font-semibold mb-4">Relatório de Higienizações</h3>
+                             <div class="flex space-x-2">
+                                 <button class="btn-report-pdf flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                     <i class="fas fa-file-pdf mr-2"></i>PDF
+                                 </button>
+                                 <button class="btn-report-excel flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                     <i class="fas fa-file-excel mr-2"></i>Excel
+                                 </button>
+                             </div>
+                         </div>
+                         <div class="bg-white rounded-lg shadow-sm border p-6">
+                             <h3 class="text-lg font-semibold mb-4">Relatório de Estoque</h3>
+                             <div class="flex space-x-2">
+                                 <button class="btn-report-pdf flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                     <i class="fas fa-file-pdf mr-2"></i>PDF
+                                 </button>
+                                 <button class="btn-report-excel flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                     <i class="fas fa-file-excel mr-2"></i>Excel
+                                 </button>
+                             </div>
+                         </div>
+                         <div class="bg-white rounded-lg shadow-sm border p-6">
+                             <h3 class="text-lg font-semibold mb-4">Relatório de Usuários</h3>
+                             <div class="flex space-x-2">
+                                 <button class="btn-report-pdf flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                                     <i class="fas fa-file-pdf mr-2"></i>PDF
+                                 </button>
+                                 <button class="btn-report-excel flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                     <i class="fas fa-file-excel mr-2"></i>Excel
+                                 </button>
+                             </div>
+                         </div>
                     </div>
                 </div>
             `);
@@ -514,16 +526,20 @@ export const Views = {
                 <div class="space-y-6">
                     <h1 class="text-2xl font-bold text-gray-800">Pedidos</h1>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-lg shadow-sm border p-6">
-                            <h3 class="text-lg font-semibold mb-4">Sugestão de Compra de Peças</h3>
-                            <p class="text-gray-600 mb-4">Nenhum item com estoque baixo.</p>
-                            <button class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Pedido Manual</button>
-                        </div>
-                        <div class="bg-white rounded-lg shadow-sm border p-6">
-                            <h3 class="text-lg font-semibold mb-4">Pedido de Novas Máscaras</h3>
-                            <p class="text-gray-600 mb-4">Crie um pedido de compra manual para novas máscaras de proteção.</p>
-                            <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Criar Pedido de Máscaras</button>
-                        </div>
+                                                 <div class="bg-white rounded-lg shadow-sm border p-6">
+                             <h3 class="text-lg font-semibold mb-4">Sugestão de Compra de Peças</h3>
+                             <p class="text-gray-600 mb-4">Nenhum item com estoque baixo.</p>
+                             <button class="btn-manual-order bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                                 <i class="fas fa-clipboard-list mr-2"></i>Pedido Manual
+                             </button>
+                         </div>
+                         <div class="bg-white rounded-lg shadow-sm border p-6">
+                             <h3 class="text-lg font-semibold mb-4">Pedido de Novas Máscaras</h3>
+                             <p class="text-gray-600 mb-4">Crie um pedido de compra manual para novas máscaras de proteção.</p>
+                             <button class="btn-mask-order bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                                 <i class="fas fa-plus mr-2"></i>Criar Pedido de Máscaras
+                             </button>
+                         </div>
                     </div>
                 </div>
             `);

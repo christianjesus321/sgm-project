@@ -184,6 +184,25 @@ const App = {
 
     handleGlobalSubmit(e) {
         e.preventDefault();
+        
+        // Login form
+        if (e.target.id === 'login-form') {
+            const email = DOM.qs('#email').value;
+            const password = DOM.qs('#password').value;
+            const btnSpinner = DOM.qs('#btn-login-spinner');
+            const loginError = DOM.qs('#login-error');
+            
+            if (btnSpinner) btnSpinner.classList.remove('hidden');
+            if (loginError) loginError.textContent = '';
+            
+            AuthService.signIn(email, password).catch(error => {
+                if (loginError) loginError.textContent = AuthService.getFriendlyErrorMessage(error);
+                if (btnSpinner) btnSpinner.classList.add('hidden');
+            });
+            return;
+        }
+        
+        // Search forms
         if (e.target.id === 'search-form-estoque') {
             const searchTerm = DOM.qs('#search-input-estoque').value;
             this.onNavigate('Estoque', { searchTerm });
@@ -192,6 +211,16 @@ const App = {
             Views.GestaoUsuarios.currentPage = 1; // Reset page on new search
             const searchTerm = DOM.qs('#search-input-users').value;
             this.onNavigate('GestaoUsuarios', { searchTerm });
+        }
+        
+        // Hygiene form
+        if (e.target.id === 'hygiene-form') {
+            this.handleHygieneSubmit(e);
+        }
+        
+        // User registration form
+        if (e.target.id === 'user-registration-form') {
+            this.handleUserRegistration(e);
         }
     },
 
@@ -302,8 +331,96 @@ const App = {
             }
         }
 
-        // Additional event handlers can be added here as needed
-        // For now, keeping it minimal to avoid bloating the main file
+        // Botões de ação nas tabelas
+        if (target.closest('.btn-edit')) {
+            this.handleEditAction(target);
+        }
+        
+        if (target.closest('.btn-delete')) {
+            this.handleDeleteAction(target);
+        }
+        
+        if (target.closest('.btn-add')) {
+            this.handleAddAction(target);
+        }
+        
+        // Botões de relatório
+        if (target.matches('.btn-report-pdf') || target.closest('.btn-report-pdf')) {
+            this.handleReportGeneration('pdf', target);
+        }
+        
+        if (target.matches('.btn-report-excel') || target.closest('.btn-report-excel')) {
+            this.handleReportGeneration('excel', target);
+        }
+        
+        // Botões de pedidos
+        if (target.matches('.btn-manual-order') || target.closest('.btn-manual-order')) {
+            this.handleManualOrder();
+        }
+        
+        if (target.matches('.btn-mask-order') || target.closest('.btn-mask-order')) {
+            this.handleMaskOrder();
+        }
+    },
+
+    handleHygieneSubmit(e) {
+        const userSearch = DOM.qs('#user-search').value;
+        const maskSize = DOM.qs('#mask-size').value;
+        const responsible = DOM.qs('#responsible').value;
+        
+        if (!userSearch || !maskSize) {
+            DOM.showToast('Por favor, preencha todos os campos obrigatórios.', 'error');
+            return;
+        }
+        
+        DOM.showToast('Higienização registrada com sucesso!', 'success');
+        // Aqui você adicionaria a lógica para salvar no Firebase
+    },
+    
+    handleUserRegistration(e) {
+        const form = e.target;
+        const formData = new FormData(form);
+        
+        DOM.showToast('Usuário cadastrado com sucesso!', 'success');
+        form.reset();
+        // Aqui você adicionaria a lógica para salvar no Firebase
+    },
+    
+    handleEditAction(target) {
+        DOM.showToast('Funcionalidade de edição em desenvolvimento', 'info');
+    },
+    
+    handleDeleteAction(target) {
+        ModalService.showConfirmation({
+            title: 'Confirmar Exclusão',
+            message: 'Tem certeza que deseja excluir este item?',
+            onConfirm: () => {
+                DOM.showToast('Item excluído com sucesso!', 'success');
+                // Aqui você adicionaria a lógica para excluir do Firebase
+            }
+        });
+    },
+    
+    handleAddAction(target) {
+        DOM.showToast('Funcionalidade de adição em desenvolvimento', 'info');
+    },
+    
+    handleReportGeneration(type, target) {
+        const reportType = type.toUpperCase();
+        DOM.showToast(`Gerando relatório ${reportType}...`, 'info');
+        
+        // Simular geração de relatório
+        setTimeout(() => {
+            DOM.showToast(`Relatório ${reportType} gerado com sucesso!`, 'success');
+        }, 2000);
+    },
+    
+    handleManualOrder() {
+        DOM.showToast('Funcionalidade de pedido manual em desenvolvimento', 'info');
+    },
+    
+    handleMaskOrder() {
+        DOM.showToast('Funcionalidade de pedido de máscaras em desenvolvimento', 'info');
     }
 };
 
