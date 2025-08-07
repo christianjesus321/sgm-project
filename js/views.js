@@ -2,9 +2,7 @@
 // MÓDULO: COMPONENTES DE TELA (VIEWS)
 // =================================================================================
 import { DOM, getUserStatus } from './utils.js';
-import { DataService } from './services.js';
 
-// Objeto que contém a lógica de renderização para cada tela
 export const Views = {
     // Tela de Login
     Auth: {
@@ -38,7 +36,7 @@ export const Views = {
         }
     },
 
-    // Layout Principal da Aplicação
+    // Layout Principal
     AppLayout: {
         render(user) {
             const { isAdmin, role } = user;
@@ -88,7 +86,6 @@ export const Views = {
         render(data, user) {
             const { usuarios, estoque, historico } = data;
             
-            // Calcular métricas
             const totalUsers = usuarios.length;
             const lowStockItems = estoque.filter(item => item.qtd <= item.qtdMin).length;
             const recentHygiene = historico.filter(h => {
@@ -102,7 +99,6 @@ export const Views = {
             <div class="space-y-6">
                 <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
                 
-                <!-- KPIs -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div class="bg-white p-6 rounded-lg shadow-sm border">
                         <div class="flex items-center">
@@ -153,7 +149,6 @@ export const Views = {
                     </div>
                 </div>
                 
-                <!-- Gráficos e Tabelas -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded-lg shadow-sm border">
                         <h3 class="text-lg font-semibold mb-4">Higienizações nos Últimos 7 Dias</h3>
@@ -206,7 +201,6 @@ export const Views = {
                     </button>
                 </div>
                 
-                <!-- Busca -->
                 <form id="search-form-estoque" class="flex gap-4">
                     <input type="text" id="search-input-estoque" placeholder="Buscar peça..." 
                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -216,7 +210,6 @@ export const Views = {
                     </button>
                 </form>
                 
-                <!-- Tabela -->
                 <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
                     <table class="w-full">
                         <thead class="bg-gray-50">
@@ -259,193 +252,43 @@ export const Views = {
         }
     },
 
-    // Higienização
+    // Outras views básicas
     Higienizacao: {
         render(data, user) {
-            const { usuarios, estoque } = data;
-            
-            const html = `
-            <div class="max-w-4xl mx-auto">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6">Registrar Higienização</h1>
-                
-                <div class="bg-white rounded-lg shadow-sm border p-6">
-                    <form id="hygiene-form">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Usuário</label>
-                                <input type="text" id="user-search" placeholder="Digite para buscar ou escaneie o QR Code" 
-                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            DOM.render('#view-content', `
+                <div class="max-w-4xl mx-auto">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-6">Registrar Higienização</h1>
+                    <div class="bg-white rounded-lg shadow-sm border p-6">
+                        <form id="hygiene-form">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Usuário</label>
+                                    <input type="text" id="user-search" placeholder="Digite para buscar ou escaneie o QR Code" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Tamanho da Máscara</label>
+                                    <input type="text" id="mask-size" placeholder="P, M, G" 
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Tamanho da Máscara</label>
-                                <input type="text" id="mask-size" placeholder="P, M, G" 
-                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
+                                <input type="text" id="responsible" value="${user.email}" readonly 
+                                       class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
                             </div>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
-                            <input type="text" id="responsible" value="${user.email}" readonly 
-                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                        </div>
-                        
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold mb-4">Peças Trocadas</h3>
-                            <div class="space-y-3">
-                                ${estoque.map(item => `
-                                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                                        <div>
-                                            <span class="font-medium">${item.nome}</span>
-                                            <span class="text-sm text-gray-500 ml-2">(Disp: ${item.qtd})</span>
-                                        </div>
-                                        <input type="number" min="0" value="0" 
-                                               class="w-20 px-3 py-1 border border-gray-300 rounded text-center"
-                                               data-item-id="${item.id}">
-                                    </div>
-                                `).join('')}
+                            <div class="flex justify-end">
+                                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                                    Registrar
+                                </button>
                             </div>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Relatório de Danos/Observações</label>
-                            <textarea id="damage-report" rows="4" 
-                                      placeholder="Descreva qualquer dano encontrado..." 
-                                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                        </div>
-                        
-                        <div class="flex justify-end">
-                            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                                Registrar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>`;
-            
-            DOM.render('#view-content', html);
-        }
-    },
-
-    // Gestão de Usuários
-    GestaoUsuarios: {
-        currentPage: 1,
-        itemsPerPage: 10,
-        
-        render(data, user, params = {}) {
-            const { usuarios } = data;
-            const { searchTerm = '' } = params;
-            
-            const filteredUsers = usuarios.filter(u => 
-                !searchTerm || u.nome.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            
-            const totalPages = Math.ceil(filteredUsers.length / this.itemsPerPage);
-            const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-            const endIndex = startIndex + this.itemsPerPage;
-            const currentUsers = filteredUsers.slice(startIndex, endIndex);
-
-            const html = `
-            <div class="space-y-6">
-                <div class="flex justify-between items-center">
-                    <h1 class="text-2xl font-bold text-gray-800">Gestão de Usuários</h1>
-                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-plus mr-2"></i>Novo Usuário
-                    </button>
-                </div>
-                
-                <!-- Busca -->
-                <form id="search-form-users" class="flex gap-4">
-                    <input type="text" id="search-input-users" placeholder="Buscar usuário..." 
-                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                           value="${searchTerm}">
-                    <button type="submit" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </form>
-                
-                <!-- Tabela -->
-                <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setores</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Teste</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Máscara</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${currentUsers.map(user => {
-                                const status = getUserStatus(user);
-                                return `
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.nome}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.setores?.join(', ') || 'N/A'}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.test.class}">
-                                            ${status.test.text}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.mask.class}">
-                                            ${status.mask.text}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div class="flex space-x-2">
-                                            <button class="text-blue-600 hover:text-blue-900"><i class="fas fa-sync-alt"></i></button>
-                                            <button class="text-green-600 hover:text-green-900"><i class="fas fa-th"></i></button>
-                                            <button class="text-yellow-600 hover:text-yellow-900"><i class="fas fa-edit"></i></button>
-                                            <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Paginação -->
-                ${totalPages > 1 ? `
-                <div class="flex justify-between items-center">
-                    <p class="text-sm text-gray-700">Página ${this.currentPage} de ${totalPages}</p>
-                    <div class="flex space-x-2">
-                        <button onclick="Views.GestaoUsuarios.previousPage()" 
-                                class="px-3 py-1 border border-gray-300 rounded text-sm ${this.currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}">
-                            Anterior
-                        </button>
-                        <button onclick="Views.GestaoUsuarios.nextPage()" 
-                                class="px-3 py-1 border border-gray-300 rounded text-sm ${this.currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}">
-                            Próximo
-                        </button>
+                        </form>
                     </div>
                 </div>
-                ` : ''}
-            </div>`;
-            
-            DOM.render('#view-content', html);
-        },
-        
-        previousPage() {
-            if (this.currentPage > 1) {
-                this.currentPage--;
-                this.render(window.App.state.data, window.App.state.user);
-            }
-        },
-        
-        nextPage() {
-            const { usuarios } = window.App.state.data;
-            const totalPages = Math.ceil(usuarios.length / this.itemsPerPage);
-            if (this.currentPage < totalPages) {
-                this.currentPage++;
-                this.render(window.App.state.data, window.App.state.user);
-            }
+            `);
         }
     },
 
-    // Outras views básicas
     Cadastros: {
         render(data, user) {
             DOM.render('#view-content', `
@@ -497,229 +340,226 @@ export const Views = {
         }
     },
 
-    MascarasReserva: {
-        render(data, user) {
-            const { mascarasReserva } = data;
+    GestaoUsuarios: {
+        currentPage: 1,
+        itemsPerPage: 10,
+        
+        render(data, user, params = {}) {
+            const { usuarios } = data;
+            const { searchTerm = '' } = params;
             
+            const filteredUsers = usuarios.filter(u => 
+                !searchTerm || u.nome.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            
+            const totalPages = Math.ceil(filteredUsers.length / this.itemsPerPage);
+            const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+            const endIndex = startIndex + this.itemsPerPage;
+            const currentUsers = filteredUsers.slice(startIndex, endIndex);
+
             const html = `
             <div class="space-y-6">
                 <div class="flex justify-between items-center">
-                    <h1 class="text-2xl font-bold text-gray-800">Máscaras de Reserva</h1>
+                    <h1 class="text-2xl font-bold text-gray-800">Gestão de Usuários</h1>
                     <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-plus mr-2"></i>Nova Máscara
+                        <i class="fas fa-plus mr-2"></i>Novo Usuário
                     </button>
                 </div>
+                
+                <form id="search-form-users" class="flex gap-4">
+                    <input type="text" id="search-input-users" placeholder="Buscar usuário..." 
+                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           value="${searchTerm}">
+                    <button type="submit" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </form>
                 
                 <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
                     <table class="w-full">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Identificação</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tamanho</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário Atual</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setores</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Teste</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Máscara</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            ${mascarasReserva.map(mascara => `
+                            ${currentUsers.map(user => {
+                                const status = getUserStatus(user);
+                                return `
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${mascara.identificacao}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${mascara.tamanho}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.nome}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.setores?.join(', ') || 'N/A'}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                            ${mascara.status || 'Disponível'}
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.test.class}">
+                                            ${status.test.text}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${mascara.usuarioAtual || 'N/A'}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status.mask.class}">
+                                            ${status.mask.text}
+                                        </span>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div class="flex space-x-2">
-                                            <button class="text-blue-600 hover:text-blue-900"><i class="fas fa-th"></i></button>
-                                            <button class="text-green-600 hover:text-green-900"><i class="fas fa-comment"></i></button>
-                                            <button class="text-yellow-600 hover:text-yellow-900"><i class="fas fa-sync-alt"></i></button>
+                                            <button class="text-blue-600 hover:text-blue-900"><i class="fas fa-sync-alt"></i></button>
+                                            <button class="text-green-600 hover:text-green-900"><i class="fas fa-th"></i></button>
+                                            <button class="text-yellow-600 hover:text-yellow-900"><i class="fas fa-edit"></i></button>
                                             <button class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </td>
                                 </tr>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
+                
+                ${totalPages > 1 ? `
+                <div class="flex justify-between items-center">
+                    <p class="text-sm text-gray-700">Página ${this.currentPage} de ${totalPages}</p>
+                    <div class="flex space-x-2">
+                        <button onclick="Views.GestaoUsuarios.previousPage()" 
+                                class="px-3 py-1 border border-gray-300 rounded text-sm ${this.currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}">
+                            Anterior
+                        </button>
+                        <button onclick="Views.GestaoUsuarios.nextPage()" 
+                                class="px-3 py-1 border border-gray-300 rounded text-sm ${this.currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}">
+                            Próximo
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
             </div>`;
             
             DOM.render('#view-content', html);
+        },
+        
+        previousPage() {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.render(window.App.state.data, window.App.state.user);
+            }
+        },
+        
+        nextPage() {
+            const { usuarios } = window.App.state.data;
+            const totalPages = Math.ceil(usuarios.length / this.itemsPerPage);
+            if (this.currentPage < totalPages) {
+                this.currentPage++;
+                this.render(window.App.state.data, window.App.state.user);
+            }
+        }
+    },
+
+    // Views básicas para outras seções
+    MascarasReserva: {
+        render(data, user) {
+            DOM.render('#view-content', `
+                <div class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h1 class="text-2xl font-bold text-gray-800">Máscaras de Reserva</h1>
+                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>Nova Máscara
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-500">
+                        <i class="fas fa-people-carry-box text-4xl mb-4"></i>
+                        <p>Funcionalidade em desenvolvimento</p>
+                    </div>
+                </div>
+            `);
         }
     },
 
     Relatorios: {
         render(data, user) {
-            const html = `
-            <div class="space-y-6">
-                <h1 class="text-2xl font-bold text-gray-800">Relatórios</h1>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-lg shadow-sm border p-6">
-                        <h3 class="text-lg font-semibold mb-4">Relatório de Higienizações</h3>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <input type="date" class="px-3 py-2 border border-gray-300 rounded-lg">
-                                <input type="date" class="px-3 py-2 border border-gray-300 rounded-lg">
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <select class="px-3 py-2 border border-gray-300 rounded-lg">
-                                    <option>Todos</option>
-                                </select>
-                                <select class="px-3 py-2 border border-gray-300 rounded-lg">
-                                    <option>Todos</option>
-                                </select>
-                            </div>
+            DOM.render('#view-content', `
+                <div class="space-y-6">
+                    <h1 class="text-2xl font-bold text-gray-800">Relatórios</h1>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-white rounded-lg shadow-sm border p-6">
+                            <h3 class="text-lg font-semibold mb-4">Relatório de Higienizações</h3>
                             <div class="flex space-x-2">
-                                <button class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm">Hoje</button>
-                                <button class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm">Esta Semana</button>
-                                <button class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm">Este Mês</button>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
-                                    <i class="fas fa-file-pdf mr-2"></i>Gerar PDF
-                                </button>
-                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                                    <i class="fas fa-file-excel mr-2"></i>Gerar Excel
-                                </button>
+                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
+                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow-sm border p-6">
-                        <h3 class="text-lg font-semibold mb-4">Relatório de Estoque</h3>
-                        <div class="flex space-x-2">
-                            <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
-                            <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
+                        <div class="bg-white rounded-lg shadow-sm border p-6">
+                            <h3 class="text-lg font-semibold mb-4">Relatório de Estoque</h3>
+                            <div class="flex space-x-2">
+                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
+                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow-sm border p-6">
-                        <h3 class="text-lg font-semibold mb-4">Relatório de Usuários</h3>
-                        <div class="flex space-x-2">
-                            <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
-                            <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
+                        <div class="bg-white rounded-lg shadow-sm border p-6">
+                            <h3 class="text-lg font-semibold mb-4">Relatório de Usuários</h3>
+                            <div class="flex space-x-2">
+                                <button class="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">PDF</button>
+                                <button class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Excel</button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>`;
-            
-            DOM.render('#view-content', html);
+            `);
         }
     },
 
     Pedidos: {
         render(data, user) {
-            const html = `
-            <div class="space-y-6">
-                <h1 class="text-2xl font-bold text-gray-800">Pedidos</h1>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-lg shadow-sm border p-6">
-                        <h3 class="text-lg font-semibold mb-4">Sugestão de Compra de Peças</h3>
-                        <p class="text-gray-600 mb-4">Nenhum item com estoque baixo.</p>
-                        <button class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Pedido Manual</button>
-                    </div>
-                    
-                    <div class="bg-white rounded-lg shadow-sm border p-6">
-                        <h3 class="text-lg font-semibold mb-4">Pedido de Novas Máscaras</h3>
-                        <p class="text-gray-600 mb-4">Crie um pedido de compra manual para novas máscaras de proteção.</p>
-                        <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Criar Pedido de Máscaras</button>
+            DOM.render('#view-content', `
+                <div class="space-y-6">
+                    <h1 class="text-2xl font-bold text-gray-800">Pedidos</h1>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-sm border p-6">
+                            <h3 class="text-lg font-semibold mb-4">Sugestão de Compra de Peças</h3>
+                            <p class="text-gray-600 mb-4">Nenhum item com estoque baixo.</p>
+                            <button class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Pedido Manual</button>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border p-6">
+                            <h3 class="text-lg font-semibold mb-4">Pedido de Novas Máscaras</h3>
+                            <p class="text-gray-600 mb-4">Crie um pedido de compra manual para novas máscaras de proteção.</p>
+                            <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Criar Pedido de Máscaras</button>
+                        </div>
                     </div>
                 </div>
-            </div>`;
-            
-            DOM.render('#view-content', html);
+            `);
         }
     },
 
     QuadroDeAvisos: {
         render(data, user) {
-            const { noticeBoard } = data;
-            
-            const html = `
-            <div class="space-y-6">
-                <div class="flex justify-between items-center">
-                    <h1 class="text-2xl font-bold text-gray-800">Quadro de Avisos</h1>
-                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-plus mr-2"></i>Novo Aviso
-                    </button>
+            DOM.render('#view-content', `
+                <div class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h1 class="text-2xl font-bold text-gray-800">Quadro de Avisos</h1>
+                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>Novo Aviso
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-500">
+                        <i class="fas fa-bullhorn text-4xl mb-4"></i>
+                        <p>Nenhum aviso publicado.</p>
+                    </div>
                 </div>
-                
-                <div class="space-y-4">
-                    ${noticeBoard.length > 0 ? noticeBoard.map(aviso => `
-                        <div class="bg-white rounded-lg shadow-sm border p-6">
-                            <div class="flex justify-between items-start mb-4">
-                                <h3 class="text-lg font-semibold">${aviso.titulo}</h3>
-                                <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Em Andamento</span>
-                            </div>
-                            <p class="text-gray-600 mb-4">${aviso.conteudo}</p>
-                            <div class="flex justify-between items-center text-sm text-gray-500">
-                                <span>Por ${aviso.autor} em ${aviso.data}</span>
-                                <div class="flex space-x-2">
-                                    <button class="text-blue-600 hover:text-blue-800">Atualizar</button>
-                                    <button class="text-yellow-600 hover:text-yellow-800">Editar</button>
-                                    <button class="text-red-600 hover:text-red-800">Excluir</button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('') : `
-                        <div class="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-500">
-                            <i class="fas fa-bullhorn text-4xl mb-4"></i>
-                            <p>Nenhum aviso publicado.</p>
-                        </div>
-                    `}
-                </div>
-            </div>`;
-            
-            DOM.render('#view-content', html);
+            `);
         }
     },
 
     Permissoes: {
         render(data, user) {
-            const { permissao } = data;
-            
-            const html = `
-            <div class="space-y-6">
-                <h1 class="text-2xl font-bold text-gray-800">Gestão de Permissões</h1>
-                
-                <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${permissao.map(perm => `
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${perm.email}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        ${perm.nome}
-                                        <button class="ml-2 text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <select class="role-select px-3 py-1 border border-gray-300 rounded-lg text-sm" data-uid="${perm.id}">
-                                            <option value="auditor" ${perm.role === 'auditor' ? 'selected' : ''}>Auditor</option>
-                                            <option value="colaborador" ${perm.role === 'colaborador' ? 'selected' : ''}>Colaborador</option>
-                                            <option value="administrador" ${perm.role === 'administrador' ? 'selected' : ''}>Administrador</option>
-                                            <option value="desenvolvedor" ${perm.role === 'desenvolvedor' ? 'selected' : ''}>Desenvolvedor</option>
-                                        </select>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+            DOM.render('#view-content', `
+                <div class="space-y-6">
+                    <h1 class="text-2xl font-bold text-gray-800">Gestão de Permissões</h1>
+                    <div class="bg-white rounded-lg shadow-sm border p-6 text-center text-gray-500">
+                        <i class="fas fa-user-shield text-4xl mb-4"></i>
+                        <p>Funcionalidade em desenvolvimento</p>
+                    </div>
                 </div>
-            </div>`;
-            
-            DOM.render('#view-content', html);
+            `);
         }
     }
 };
