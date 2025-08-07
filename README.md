@@ -103,3 +103,10 @@ Para problemas técnicos, verifique:
 1. Console do navegador para erros
 2. Firebase Console para logs
 3. Netlify Dashboard para deploy
+
+## 🔄 Git e GitHub
+
+O projeto já está configurado com Git e conectado ao GitHub:
+- Repositório: https://github.com/christianjesus321/sgm-project.git
+- Deploy automático no Netlify configurado
+- Variáveis de ambiente configuradas no Netlify

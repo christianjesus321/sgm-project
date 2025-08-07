@@ -5,38 +5,34 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Função para obter variáveis de ambiente (funciona tanto no Netlify quanto localmente)
+// Função para obter variáveis de ambiente
 const getEnvVar = (name, fallback = null) => {
-    // No Netlify, as variáveis são injetadas globalmente em import.meta.env
     if (typeof import.meta !== 'undefined' && import.meta.env) {
         return import.meta.env[name] || fallback;
     }
     
-    // Para desenvolvimento local sem build tool, pode usar um objeto global
     if (typeof window !== 'undefined' && window.ENV) {
         return window.ENV[name] || fallback;
     }
     
-    // Fallback para desenvolvimento
     return fallback;
 };
 
-// Configuração do Firebase - TEMPORÁRIA PARA TESTE
-// Em produção, use variáveis de ambiente
+// Configuração do Firebase
 const firebaseConfig = {
-    apiKey: getEnvVar('VITE_FIREBASE_API_KEY', 'AIzaSyAdCrzegeV4i3tCVzaiDKqzRljtZA7Dh2A'),
-    authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', 'gcontroledehgutl.firebaseapp.com'),
-    projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', 'gcontroledehgutl'),
-    storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', 'gcontroledehgutl.appspot.com'),
-    messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', '520957417418'),
-    appId: getEnvVar('VITE_FIREBASE_APP_ID', '1:520957417418:web:b9694a3ef04d0477826133')
+    apiKey: getEnvVar('VITE_FIREBASE_API_KEY'),
+    authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: getEnvVar('VITE_FIREBASE_APP_ID')
 };
 
 // Validação das configurações
 const validateConfig = () => {
     const requiredVars = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
     const missingVars = requiredVars.filter(key => 
-        !firebaseConfig[key] || firebaseConfig[key].startsWith('SUA_')
+        !firebaseConfig[key] || firebaseConfig[key].startsWith('sua_')
     );
     
     if (missingVars.length > 0) {
@@ -50,8 +46,7 @@ const validateConfig = () => {
         console.error('');
         console.error('🔗 Mais informações: consulte o README.md');
         
-        // Removido throw para permitir execução em desenvolvimento
-        console.warn('⚠️ Continuando com configuração padrão para desenvolvimento...');
+        throw new Error('Configuração Firebase incompleta. Verifique as variáveis de ambiente.');
     }
 };
 
