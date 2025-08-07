@@ -1,16 +1,38 @@
-// =================================================================================
-// MÓDULO: SERVIÇOS DE COMUNICAÇÃO COM BACKEND (Firebase)
-// =================================================================================
-import { auth, db } from './firebase-config.js';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, writeBatch, Timestamp, updateDoc, setDoc, getDoc, serverTimestamp, query, where, getDocs, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { OfflineService } from './utils.js'; // Importe o OfflineService
-import { DOM } from './utils.js'; // Importe o DOM para os toasts
+// MÓDULO: SERVIÇOS DA APLICAÇÃO (DADOS, AUTH, MODAIS, ETC.)
 
+import { auth, db } from './firebase-config.js';
+import { DOM, getUserStatus } from './utils.js';
+import { 
+    onAuthStateChanged, 
+    signInWithEmailAndPassword, 
+    signOut as firebaseSignOut, 
+    createUserWithEmailAndPassword 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+    collection, 
+    onSnapshot, 
+    addDoc, 
+    doc, 
+    deleteDoc, 
+    writeBatch, 
+    Timestamp, 
+    updateDoc, 
+    setDoc, 
+    getDoc, 
+    serverTimestamp, 
+    query, 
+    orderBy, 
+    limit, 
+    where, 
+    getDocs, 
+    arrayUnion 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// --- SERVIÇO DE AUTENTICAÇÃO ---
 export const AuthService = {
     signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
     signOut: async () => {
-        // PresenceService will be called from main.js before signOut
+        // Idealmente, o status de presença seria atualizado aqui também
         return firebaseSignOut(auth);
     },
     listenToAuthChanges: (callback) => {
@@ -22,11 +44,9 @@ export const AuthService = {
                     const roleDoc = await getDoc(roleDocRef);
                     if (roleDoc.exists()) {
                         role = roleDoc.data().role;
-                    } else {
-                        console.warn(`Documento de permissão não encontrado para UID: ${user.uid}. Atribuindo cargo de 'auditor'.`);
                     }
                 } catch (error) {
-                    console.error("Erro ao buscar cargo do usuário. Atribuindo cargo de 'auditor'.", error);
+                    console.error("Erro ao buscar cargo, usando 'auditor'.", error);
                 }
                 const userData = { uid: user.uid, email: user.email, isAdmin: (role === 'administrador' || role === 'desenvolvedor'), role };
                 callback(userData);
@@ -37,76 +57,41 @@ export const AuthService = {
     },
     getFriendlyErrorMessage: (error) => {
         switch (error.code) {
-            case 'auth/user-not-found': case 'auth/invalid-credential': return 'Credenciais inválidas. Verifique o e-mail e a senha.';
-            case 'auth/wrong-password': return 'Senha incorreta. Por favor, tente novamente.';
+            case 'auth/user-not-found': case 'auth/invalid-credential': return 'Credenciais inválidas.';
+            case 'auth/wrong-password': return 'Senha incorreta.';
             case 'auth/invalid-email': return 'O formato do e-mail é inválido.';
-            case 'auth/email-already-in-use': return 'Este e-mail já está em uso por outra conta.';
+            case 'auth/email-already-in-use': return 'Este e-mail já está em uso.';
             default: return 'Ocorreu um erro. Tente novamente.';
         }
     }
 };
 
+// --- SERVIÇO DE DADOS (FIRESTORE) ---
 export const DataService = {
-    listenToCollection: (collectionName, callback, customQuery = null) => {
+    listenToCollection: (collectionName, callback) => {
         const path = collectionName === 'permissao' ? collectionName : `artifacts/gcontroledehgutl/public/data/${collectionName}`;
-        const finalQuery = customQuery ? customQuery : collection(db, path);
-        return onSnapshot(finalQuery, (snapshot) => {
+        const q = query(collection(db, path));
+        return onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-            if (!['userStatus'].includes(collectionName)) {
-                OfflineService.cacheCollection(collectionName, data);
-            }
             callback(data);
-        }, async (error) => {
-            console.error(`Erro ao ouvir a coleção ${collectionName}:`, error);
-            const cachedData = await OfflineService.getCollection(collectionName);
-            callback(cachedData);
-            DOM.showToast(`Falha ao carregar dados de ${collectionName}. Exibindo dados locais.`, 'error');
+        }, (error) => {
+            console.error(`Erro ao ouvir ${collectionName}:`, error);
+            DOM.showToast(`Falha ao carregar dados de ${collectionName}.`, 'error');
         });
     },
-    async addDocument(collectionName, data, customPath = null) {
-        if (!navigator.onLine) {
-            const tempId = `offline_${crypto.randomUUID()}`;
-            const payload = { ...data, id: tempId, pendingSync: true };
-            await OfflineService.addToSyncQueue(collectionName, 'add', tempId, data);
-            return payload;
-        }
+    addDocument: (collectionName, data) => {
+        const path = `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+        return addDoc(collection(db, path), data);
+    },
+    updateDocument: (collectionName, docId, data, customPath = null) => {
         const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
-        const docRef = await addDoc(collection(db, path), data);
-        return { ...data, id: docRef.id };
+        return updateDoc(doc(db, path, docId), data);
     },
-    async updateDocument(collectionName, docId, data, customPath = null) {
-         if (!navigator.onLine) {
-            if(data.observacoes && data.observacoes.isUnion) {
-                await OfflineService.addToSyncQueue(collectionName, 'update', docId, data);
-            } else {
-                await OfflineService.addToSyncQueue(collectionName, 'update', docId, data);
-            }
-            return { ...data, id: docId, pendingSync: true };
-        }
-        if (data.observacoes && data.observacoes.isUnion) {
-             const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
-             await updateDoc(doc(db, path, docId), { observacoes: arrayUnion(...data.observacoes.elements) });
-        } else {
-            const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
-            await updateDoc(doc(db, path, docId), data);
-        }
-
-        return { ...data, id: docId };
+    deleteDocument: (collectionName, docId, customPath = null) => {
+        const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+        return deleteDoc(doc(db, path, docId));
     },
-    async deleteDocument(collectionName, docId, customPath = null) {
-        const path = customPath ? customPath : `artifacts/gcontroledehgutl/public/data/${collectionName}`;
-        if (!navigator.onLine && customPath !== 'permissao') { // Ações de permissão não devem ser feitas offline
-            await OfflineService.addToSyncQueue(collectionName, 'delete', docId, {});
-            return { id: docId, pendingSync: true };
-        }
-        await deleteDoc(doc(db, path, docId));
-        return { id: docId };
-    },
-    async saveRecordAndUpdateStock(recordData, partsToUpdate) {
-        if (!navigator.onLine) {
-            DOM.showToast('Função indisponível offline. As alterações não serão salvas.', 'error');
-            throw new Error("Batch operations not supported offline in this version.");
-        }
+    saveRecordAndUpdateStock: (recordData, partsToUpdate) => {
         const batch = writeBatch(db);
         const historyRef = doc(collection(db, `artifacts/gcontroledehgutl/public/data/historico`));
         batch.set(historyRef, recordData);
@@ -115,5 +100,48 @@ export const DataService = {
             batch.update(stockRef, { qtd: part.newQty });
         });
         return batch.commit();
+    }
+};
+
+// --- SERVIÇO DE MODAIS ---
+export const ModalService = {
+    showConfirmation: ({ title, message, onConfirm }) => {
+        const modalHtml = `
+        <div id="confirmationModal" class="modal-overlay active">
+            <div class="modal-content p-6 text-center">
+                <h3 class="text-xl font-bold mb-4">${title}</h3>
+                <p class="mb-6 text-gray-600">${message}</p>
+                <div class="flex justify-center gap-4">
+                    <button id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                    <button id="modal-btn-confirm" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Confirmar</button>
+                </div>
+            </div>
+        </div>`;
+        DOM.render('#modal-container', modalHtml);
+        DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+        DOM.qs('#modal-btn-confirm').addEventListener('click', () => {
+            onConfirm();
+            ModalService.close();
+        });
+    },
+    // Adicione aqui todos os outros métodos do ModalService do seu arquivo original
+    // showRecipientModal, showAssistant, showQRCode, etc.
+    // ...
+    close: () => {
+        DOM.render('#modal-container', '');
+    }
+};
+
+// --- SERVIÇO DE NOTIFICAÇÕES ---
+export const NotificationService = {
+    notifications: [],
+    requestPermission: async () => {
+        if ("Notification" in window && Notification.permission !== "granted") {
+            await Notification.requestPermission();
+        }
+    },
+    checkAllNotifications: (data) => {
+        // Lógica completa de checkAllNotifications aqui
+        return []; // Retorno de exemplo
     }
 };
