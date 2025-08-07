@@ -1,8 +1,9 @@
 // =================================================================================
-// SERVIÇOS DE AUTENTICAÇÃO E DADOS
+// SERVIÇOS DE DADOS
 // =================================================================================
 
 import { auth, db } from './firebase-config.js';
+import { OfflineService, DOM } from './utils.js';
 import { 
     collection,
     onSnapshot,
@@ -10,7 +11,6 @@ import {
     doc,
     deleteDoc,
     updateDoc,
-    getDoc,
     setDoc,
     serverTimestamp,
     query,
@@ -30,32 +30,22 @@ export const DataService = {
         return onSnapshot(finalQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
             if (!['userStatus'].includes(collectionName)) {
-                // Cache offline se disponível
-                if (window.OfflineService) {
-                    window.OfflineService.cacheCollection(collectionName, data);
-                }
+                OfflineService.cacheCollection(collectionName, data);
             }
             callback(data);
         }, async (error) => {
             console.error(`Erro ao ouvir a coleção ${collectionName}:`, error);
-            // Tenta buscar dados do cache offline se disponível
-            if (window.OfflineService) {
-                const cachedData = await window.OfflineService.getCollection(collectionName);
-                callback(cachedData);
-                if (window.DOM) {
-                    window.DOM.showToast(`Falha ao carregar dados de ${collectionName}. Exibindo dados locais.`, 'error');
-                }
-            } else {
-                callback([]);
-            }
+            const cachedData = await OfflineService.getCollection(collectionName);
+            callback(cachedData);
+            DOM.showToast(`Falha ao carregar dados de ${collectionName}. Exibindo dados locais.`, 'error');
         });
     },
     
     async addDocument(collectionName, data, customPath = null) {
-        if (!navigator.onLine && window.OfflineService) {
+        if (!navigator.onLine) {
             const tempId = `offline_${crypto.randomUUID()}`;
             const payload = { ...data, id: tempId, pendingSync: true };
-            await window.OfflineService.addToSyncQueue(collectionName, 'add', tempId, data);
+            await OfflineService.addToSyncQueue(collectionName, 'add', tempId, data);
             return payload;
         }
         const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
@@ -64,8 +54,8 @@ export const DataService = {
     },
     
     async updateDocument(collectionName, docId, data, customPath = null) {
-        if (!navigator.onLine && window.OfflineService) {
-            await window.OfflineService.addToSyncQueue(collectionName, 'update', docId, data);
+        if (!navigator.onLine) {
+            await OfflineService.addToSyncQueue(collectionName, 'update', docId, data);
             return { ...data, id: docId, pendingSync: true };
         }
         
@@ -82,8 +72,8 @@ export const DataService = {
     
     async deleteDocument(collectionName, docId, customPath = null) {
         const path = customPath ? customPath : `artifacts/gcontroledehgutl/public/data/${collectionName}`;
-        if (!navigator.onLine && customPath !== 'permissao' && window.OfflineService) {
-            await window.OfflineService.addToSyncQueue(collectionName, 'delete', docId, {});
+        if (!navigator.onLine && customPath !== 'permissao') {
+            await OfflineService.addToSyncQueue(collectionName, 'delete', docId, {});
             return { id: docId, pendingSync: true };
         }
         await deleteDoc(doc(db, path, docId));
@@ -92,9 +82,7 @@ export const DataService = {
     
     async saveRecordAndUpdateStock(recordData, partsToUpdate) {
         if (!navigator.onLine) {
-            if (window.DOM) {
-                window.DOM.showToast('Função indisponível offline. As alterações não serão salvas.', 'error');
-            }
+            DOM.showToast('Função indisponível offline. As alterações não serão salvas.', 'error');
             throw new Error("Batch operations not supported offline in this version.");
         }
         const batch = writeBatch(db);

@@ -3,8 +3,30 @@
 // =================================================================================
 
 import { auth, db, HYGIENE_DEADLINE_DAYS } from './firebase-config.js';
-import { onSnapshot, addDoc, doc, deleteDoc, writeBatch, Timestamp, updateDoc, setDoc, getDoc, serverTimestamp, query, orderBy, limit, where, getDocs, arrayUnion, collection } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+    onSnapshot, 
+    addDoc, 
+    doc, 
+    deleteDoc, 
+    writeBatch, 
+    Timestamp, 
+    updateDoc, 
+    setDoc, 
+    getDoc, 
+    serverTimestamp, 
+    query, 
+    orderBy, 
+    limit, 
+    where, 
+    getDocs, 
+    arrayUnion, 
+    collection 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+    onAuthStateChanged, 
+    signInWithEmailAndPassword, 
+    signOut as firebaseSignOut 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const DOM = {
     qs: (selector, parent = document) => parent.querySelector(selector),
@@ -478,18 +500,6 @@ const ModalService = {
     }
 };
 
-const ReportService = {
-    generatePDF: (data, user, type) => {
-        console.log('Gerando relatório PDF:', type);
-        DOM.showToast('Relatório PDF gerado com sucesso!', 'success');
-    },
-    
-    generateExcel: (data, user, type) => {
-        console.log('Gerando relatório Excel:', type);
-        DOM.showToast('Relatório Excel gerado com sucesso!', 'success');
-    }
-};
-
 // Exporta os serviços e utilitários
 export { 
     DOM, 
@@ -499,6 +509,5 @@ export {
     OfflineService, 
     NotificationService, 
     AssistantService, 
-    ModalService, 
-    ReportService 
+    ModalService 
 };

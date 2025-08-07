@@ -1,9 +1,8 @@
 // =================================================================================
-// APLICAÇÃO PRINCIPAL - S.G.M
+// MÓDULO: APLICAÇÃO PRINCIPAL
 // =================================================================================
 
-import { auth, db } from './firebase-config.js';
-import { DataService } from './services.js';
+import { auth, db, HYGIENE_DEADLINE_DAYS } from './firebase-config.js';
 import { 
     DOM, 
     getUserStatus, 
@@ -12,508 +11,578 @@ import {
     OfflineService, 
     NotificationService, 
     AssistantService, 
-    ModalService, 
-    ReportService 
+    ModalService 
 } from './utils.js';
+import { DataService } from './services.js';
 import { Views } from './views.js';
-
-// Torna os serviços disponíveis globalmente para compatibilidade
-window.DOM = DOM;
-window.OfflineService = OfflineService;
-window.DataService = DataService;
+import { 
+    Timestamp, 
+    serverTimestamp, 
+    collection, 
+    doc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    query, 
+    where, 
+    getDocs, 
+    arrayUnion 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // =================================================================================
 // APLICAÇÃO PRINCIPAL
 // =================================================================================
+
 const App = {
     state: {
         user: null,
-        data: {
-            usuarios: [],
-            estoque: [],
-            historico: [],
-            mascarasReserva: [],
-            noticeBoard: [],
-            userStatus: [],
-            permissao: []
-        },
-        listeners: {},
         currentView: 'Dashboard',
+        data: {
+            usuarios: [], 
+            estoque: [], 
+            historico: [], 
+            mascarasReserva: [],
+            noticeBoard: [], 
+            permissao: [], 
+            userStatus: []
+        },
+        listeners: [],
         isDataLoaded: false
     },
 
-    async init() {
-        console.log('🚀 Iniciando S.G.M...');
+    init() {
+        console.log('Iniciando S.G.M...');
         
-        // Inicializar serviços
+        // Inicializa serviços
         OfflineService.init();
-        AssistantService.initSpeechRecognition();
+        PresenceService.init();
+        NotificationService.requestPermission();
         
-        // Configurar listeners
-        this.setupAuthListener();
+        // Configura listeners de autenticação
+        AuthService.listenToAuthChanges((user) => {
+            this.onAuthStateChange(user);
+        });
+        
+        // Configura listeners de conexão
+        window.addEventListener('online', this.handleConnectionChange.bind(this));
+        window.addEventListener('offline', this.handleConnectionChange.bind(this));
+        
+        // Configura listeners globais
         this.addEventListeners();
         
-        // Verificar status de conexão inicial
-        this.handleConnectionChange();
-        
-        console.log('✅ S.G.M iniciado com sucesso!');
+        console.log('S.G.M iniciado com sucesso!');
     },
 
-    setupAuthListener() {
-        AuthService.listenToAuthChanges((user) => {
-            if (user) {
-                this.state.user = user;
-                this.onUserLogin();
-            } else {
-                this.state.user = null;
-                this.onUserLogout();
-            }
-        });
-    },
-
-    async onUserLogin() {
-        console.log('👤 Usuário logado:', this.state.user.email);
-        
-        // Inicializar serviços que precisam de autenticação
-        PresenceService.init();
-        await NotificationService.requestPermission();
-        
-        // Configurar listeners de dados
-        this.setupDataListeners();
-        
-        // Renderizar interface principal
-        this.renderMainInterface();
-        this.attachMainAppEventListeners();
-        
-        // Mostrar FABs
-        DOM.toggleFabs(true);
-    },
-
-    onUserLogout() {
-        console.log('👤 Usuário deslogado');
-        
-        // Parar serviços
-        PresenceService.stop();
-        this.stopDataListeners();
-        
-        // Esconder FABs
-        DOM.toggleFabs(false);
-        
-        // Renderizar tela de login
-        this.renderLoginScreen();
-    },
-
-    setupDataListeners() {
-        const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'userStatus', 'permissao'];
-        
-        collections.forEach(collectionName => {
-            this.state.listeners[collectionName] = DataService.listenToCollection(
-                collectionName, 
-                (data) => {
-                    this.state.data[collectionName] = data;
-                    this.onDataUpdate();
-                }
-            );
-        });
-    },
-
-    stopDataListeners() {
-        Object.values(this.state.listeners).forEach(unsubscribe => {
-            if (typeof unsubscribe === 'function') unsubscribe();
-        });
-        this.state.listeners = {};
-    },
-
-    onDataUpdate() {
-        // Verificar se todos os dados foram carregados pelo menos uma vez
-        const requiredCollections = ['usuarios', 'estoque', 'historico'];
-        const isLoaded = requiredCollections.every(col => this.state.data[col].length >= 0);
-        
-        if (isLoaded && !this.state.isDataLoaded) {
-            this.state.isDataLoaded = true;
-            console.log('📊 Dados iniciais carregados');
-        }
-        
-        // Atualizar notificações
-        this.updateNotifications();
-        
-        // Re-renderizar view atual se necessário
-        this.renderCurrentView();
-    },
-
-    renderLoginScreen() {
-        DOM.render('#app', `
-            <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-                <div class="max-w-md w-full space-y-8">
-                    <div>
-                        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                            S.G.M
-                        </h2>
-                        <p class="mt-2 text-center text-sm text-gray-600">
-                            Sistema de Gestão de Máscaras
-                        </p>
-                    </div>
-                    <form id="login-form" class="mt-8 space-y-6">
-                        <div id="login-error" class="text-red-600 text-sm text-center"></div>
-                        <div class="rounded-md shadow-sm -space-y-px">
-                            <div>
-                                <input id="email" name="email" type="email" autocomplete="email" required 
-                                       class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
-                                       placeholder="Email">
-                            </div>
-                            <div>
-                                <input id="password" name="password" type="password" autocomplete="current-password" required 
-                                       class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
-                                       placeholder="Senha">
-                            </div>
-                        </div>
-                        <div>
-                            <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                                <span id="btn-login-spinner" class="hidden">
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>
-                                </span>
-                                Entrar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `);
-    },
-
-    renderMainInterface() {
-        DOM.render('#app', `
-            <div id="sticky-header" class="bg-gray-50 border-b border-gray-200">
-                <header class="mx-auto px-4 sm:px-6 lg:px-8">
-                    <div class="flex justify-between items-center py-6">
-                        <div class="flex items-center">
-                            <h1 class="text-2xl font-bold text-gray-900">S.G.M</h1>
-                            <span class="ml-3 text-sm text-gray-500">Sistema de Gestão de Máscaras</span>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <div id="notification-bell" class="relative">
-                                <i class="fas fa-bell text-xl text-gray-600 hover:text-gray-800 cursor-pointer"></i>
-                                <span id="notification-badge" class="hidden"></span>
-                                <div id="notification-panel" class="hidden"></div>
-                            </div>
-                            <span class="text-sm text-gray-600">Olá, ${this.state.user.email}</span>
-                            <button id="logoutButton" class="text-sm text-red-600 hover:text-red-800">Sair</button>
-                        </div>
-                    </div>
-                </header>
-                
-                <nav class="border-t border-gray-200">
-                    <div class="mx-auto px-4 sm:px-6 lg:px-8">
-                        <div class="flex space-x-8 overflow-x-auto tabs">
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Dashboard">Dashboard</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Higienizacao">Higienização</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Cadastros">Cadastros</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Estoque">Estoque</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="MascarasReserva">Máscaras Reserva</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Relatorios">Relatórios</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Pedidos">Pedidos</button>
-                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="QuadroDeAvisos">Quadro de Avisos</button>
-                            ${this.state.user.role === 'desenvolvedor' ? '<button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Permissoes">Permissões</button>' : ''}
-                        </div>
-                    </div>
-                </nav>
-            </div>
+    async onAuthStateChange(user) {
+        if (user) {
+            console.log('Usuário logado:', user.email);
+            this.state.user = user;
             
-            <main class="flex-1 overflow-auto">
-                <div id="view-content" class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 fade-in">
-                    <!-- Conteúdo da view atual será renderizado aqui -->
-                </div>
-            </main>
-        `);
-        
-        this.renderCurrentView();
-        this.updateActiveTab();
+            // Renderiza layout da aplicação
+            Views.AppLayout.render(user);
+            
+            // Carrega dados iniciais
+            await this.loadInitialData();
+            
+            // Configura listeners da aplicação principal
+            this.attachMainAppEventListeners();
+            
+            // Mostra FABs
+            DOM.toggleFabs(true);
+            
+            // Renderiza view inicial
+            this.renderCurrentView();
+            
+        } else {
+            console.log('Usuário deslogado');
+            this.state.user = null;
+            this.state.data = {
+                usuarios: [], 
+                estoque: [], 
+                historico: [], 
+                mascarasReserva: [],
+                noticeBoard: [], 
+                permissao: [], 
+                userStatus: []
+            };
+            this.state.isDataLoaded = false;
+            
+            // Para serviços
+            PresenceService.stop();
+            
+            // Esconde FABs
+            DOM.toggleFabs(false);
+            
+            // Renderiza tela de login
+            Views.Auth.render();
+        }
+    },
+
+    async loadInitialData() {
+        try {
+            // Carrega dados do cache primeiro
+            await this.loadDataFromCache();
+            
+            // Configura listeners do Firebase
+            this.setupFirebaseListeners();
+            
+            console.log('Dados iniciais carregados');
+            this.state.isDataLoaded = true;
+            
+        } catch (error) {
+            console.error('Erro ao carregar dados iniciais:', error);
+            DOM.showToast('Erro ao carregar dados. Verificando cache...', 'error');
+            
+            // Tenta carregar do cache offline
+            await this.loadDataFromCache();
+        }
+    },
+
+    async loadDataFromCache() {
+        try {
+            const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'permissao'];
+            
+            for (const collectionName of collections) {
+                const cachedData = await OfflineService.getCollection(collectionName);
+                this.state.data[collectionName] = cachedData;
+            }
+            
+            console.log('Dados carregados do cache');
+        } catch (error) {
+            console.error('Erro ao carregar cache:', error);
+        }
+    },
+
+    setupFirebaseListeners() {
+        // Limpa listeners anteriores
+        this.state.listeners.forEach(unsubscribe => unsubscribe());
+        this.state.listeners = [];
+
+        // Configura listeners para cada coleção
+        const collections = [
+            'usuarios', 
+            'estoque', 
+            'historico', 
+            'mascarasReserva', 
+            'noticeBoard', 
+            'permissao'
+        ];
+
+        collections.forEach(collectionName => {
+            const unsubscribe = DataService.listenToCollection(collectionName, (data) => {
+                this.state.data[collectionName] = data;
+                this.renderCurrentView();
+            });
+            this.state.listeners.push(unsubscribe);
+        });
+
+        // Listener para userStatus
+        const userStatusUnsubscribe = DataService.listenToCollection('userStatus', (data) => {
+            this.state.data.userStatus = data;
+        });
+        this.state.listeners.push(userStatusUnsubscribe);
     },
 
     renderCurrentView(params = {}) {
-        if (!this.state.isDataLoaded) {
-            DOM.render('#view-content', `
-                <div class="flex items-center justify-center py-12">
-                    <div class="text-center">
-                        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
-                        <p class="text-gray-600">Carregando dados...</p>
-                    </div>
-                </div>
-            `);
-            return;
-        }
+        if (!this.state.user || !this.state.isDataLoaded) return;
 
-        const view = Views[this.state.currentView];
-        if (view && typeof view.render === 'function') {
+        const viewName = this.state.currentView;
+        const view = Views[viewName];
+        
+        if (view && view.render) {
             view.render(this.state.data, this.state.user, params);
-        } else {
-            DOM.render('#view-content', `
-                <div class="text-center py-12">
-                    <i class="fas fa-construction text-4xl text-gray-400 mb-4"></i>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">Em Desenvolvimento</h3>
-                    <p class="text-gray-600">Esta funcionalidade está sendo desenvolvida.</p>
-                </div>
-            `);
         }
-    },
-
-    updateActiveTab() {
-        DOM.qsa('.nav-tab').forEach(tab => {
-            tab.classList.remove('active');
-            if (tab.dataset.view === this.state.currentView) {
-                tab.classList.add('active');
-            }
-        });
     },
 
     onNavigate(viewName, params = {}) {
+        if (!this.state.user) return;
+
         this.state.currentView = viewName;
+        
+        // Atualiza navegação ativa
+        DOM.qsa('.nav-tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.dataset.view === viewName) {
+                tab.classList.add('active');
+            }
+        });
+
+        // Renderiza a view
         this.renderCurrentView(params);
-        this.updateActiveTab();
     },
 
     addEventListeners() {
-        window.addEventListener('online', this.handleConnectionChange.bind(this));
-        window.addEventListener('offline', this.handleConnectionChange.bind(this));
-        document.body.addEventListener('click', this.handleGlobalClick.bind(this));
-        document.body.addEventListener('change', this.handleGlobalChange.bind(this));
-        document.body.addEventListener('submit', this.handleGlobalSubmit.bind(this));
+        // Event delegation para mudanças globais
+        document.addEventListener('change', this.handleGlobalChange.bind(this));
+        document.addEventListener('submit', this.handleGlobalSubmit.bind(this));
+        document.addEventListener('click', this.handleGlobalClick.bind(this));
     },
 
     handleGlobalChange(e) {
-        // Implementar handlers de mudança aqui se necessário
+        const target = e.target;
+        
+        // Filtros de busca
+        if (target.id === 'search-input-estoque') {
+            // Implementar filtro de estoque
+        }
+        
+        if (target.id === 'search-input-users') {
+            // Implementar filtro de usuários
+        }
+        
+        // Seletores de role
+        if (target.classList.contains('role-select')) {
+            const uid = target.dataset.uid;
+            const newRole = target.value;
+            
+            ModalService.showConfirmation({
+                title: 'Confirmar Alteração',
+                message: `Deseja alterar o cargo para "${newRole}"?`,
+                onConfirm: async () => {
+                    try {
+                        await DataService.updateDocument('permissao', uid, { role: newRole });
+                        DOM.showToast('Cargo atualizado com sucesso!', 'success');
+                    } catch (error) {
+                        console.error('Erro ao atualizar cargo:', error);
+                        DOM.showToast('Erro ao atualizar cargo.', 'error');
+                    }
+                }
+            });
+        }
     },
 
     handleGlobalSubmit(e) {
-        e.preventDefault();
+        const form = e.target;
         
         // Login form
-        if (e.target.id === 'login-form') {
-            const email = DOM.qs('#email').value;
-            const password = DOM.qs('#password').value;
-            const btnSpinner = DOM.qs('#btn-login-spinner');
-            const loginError = DOM.qs('#login-error');
-            
-            if (btnSpinner) btnSpinner.classList.remove('hidden');
-            if (loginError) loginError.textContent = '';
-            
-            AuthService.signIn(email, password).catch(error => {
-                if (loginError) loginError.textContent = AuthService.getFriendlyErrorMessage(error);
-                if (btnSpinner) btnSpinner.classList.add('hidden');
-            });
-            return;
-        }
-        
-        // Search forms
-        if (e.target.id === 'search-form-estoque') {
-            const searchTerm = DOM.qs('#search-input-estoque').value;
-            this.onNavigate('Estoque', { searchTerm });
-        }
-        if (e.target.id === 'search-form-users') {
-            const searchTerm = DOM.qs('#search-input-users').value;
-            this.onNavigate('GestaoUsuarios', { searchTerm });
+        if (form.id === 'login-form') {
+            e.preventDefault();
+            this.handleLogin(form);
         }
         
         // Hygiene form
-        if (e.target.id === 'hygiene-form') {
-            this.handleHygieneSubmit(e);
+        if (form.id === 'hygiene-form') {
+            e.preventDefault();
+            this.handleHygieneSubmit(form);
         }
         
         // User registration form
-        if (e.target.id === 'user-registration-form') {
-            this.handleUserRegistration(e);
+        if (form.id === 'user-registration-form') {
+            e.preventDefault();
+            this.handleUserRegistration(form);
+        }
+        
+        // Search forms
+        if (form.id === 'search-form-estoque') {
+            e.preventDefault();
+            // Implementar busca de estoque
+        }
+        
+        if (form.id === 'search-form-users') {
+            e.preventDefault();
+            // Implementar busca de usuários
         }
     },
 
-    async handleGlobalClick(e) {
-        if (!this.state.user) return; 
+    async handleLogin(form) {
+        const email = form.querySelector('#email').value;
+        const password = form.querySelector('#password').value;
+        const btnText = form.querySelector('#btn-login-text');
+        const btnSpinner = form.querySelector('#btn-login-spinner');
+        const errorP = form.querySelector('#login-error');
 
-        const target = e.target;
+        errorP.textContent = '';
+        btnText.textContent = 'Entrando...';
+        btnSpinner.classList.remove('hidden');
+        form.querySelector('#btn-login').disabled = true;
+
+        try {
+            await AuthService.signIn(email, password);
+            // onAuthStateChange will handle the rest
+        } catch (error) {
+            errorP.textContent = AuthService.getFriendlyErrorMessage(error);
+            btnText.textContent = 'Entrar';
+            btnSpinner.classList.add('hidden');
+            form.querySelector('#btn-login').disabled = false;
+        }
+    },
+
+    async handleHygieneSubmit(form) {
+        const userSearch = form.querySelector('#user-search').value;
+        const maskSize = form.querySelector('#mask-size').value;
+        const responsible = form.querySelector('#responsible').value;
         
-        // Ações de Notificação
-        const notificationItem = target.closest('.notification-item');
-        if (notificationItem) {
-            const id = notificationItem.dataset.notificationId;
-            const notification = NotificationService.notifications.find(n => n.id === id);
-            if (notification && notification.action) {
-                notification.action();
-                DOM.qs('#notification-panel').classList.add('hidden');
+        if (!userSearch || !maskSize) {
+            DOM.showToast('Preencha todos os campos obrigatórios.', 'error');
+            return;
+        }
+
+        // Encontra o usuário
+        const user = this.state.data.usuarios.find(u => 
+            u.nome.toLowerCase().includes(userSearch.toLowerCase())
+        );
+
+        if (!user) {
+            DOM.showToast('Usuário não encontrado.', 'error');
+            return;
+        }
+
+        // Coleta peças trocadas
+        const pecasTrocadas = [];
+        const pecaInputs = form.querySelectorAll('input[data-id]');
+        pecaInputs.forEach(input => {
+            const quantidade = parseInt(input.value) || 0;
+            if (quantidade > 0) {
+                pecasTrocadas.push({
+                    id: input.dataset.id,
+                    nome: input.dataset.nome,
+                    quantidade: quantidade
+                });
             }
-        }
+        });
 
-        // Botões de ação nas tabelas
-        if (target.closest('.btn-edit')) {
-            this.handleEditAction(target);
+        // Cria registro de higienização
+        const registro = {
+            userId: user.userId,
+            userName: user.nome,
+            tamanhoMascara: maskSize,
+            pecasTrocadas: pecasTrocadas,
+            responsavel: responsible,
+            higienizadoEm: Timestamp.now(),
+            report: "Registrado via sistema"
+        };
+
+        try {
+            // Atualiza estoque
+            const partsToUpdate = pecasTrocadas.map(peca => {
+                const estoqueItem = this.state.data.estoque.find(e => e.id === peca.id);
+                return {
+                    id: peca.id,
+                    newQty: (estoqueItem?.qtd || 0) - peca.quantidade
+                };
+            });
+
+            await DataService.saveRecordAndUpdateStock(registro, partsToUpdate);
+            
+            DOM.showToast('Higienização registrada com sucesso!', 'success');
+            form.reset();
+            
+        } catch (error) {
+            console.error('Erro ao registrar higienização:', error);
+            DOM.showToast('Erro ao registrar higienização.', 'error');
         }
-        
-        if (target.closest('.btn-delete')) {
-            this.handleDeleteAction(target);
-        }
-        
-        if (target.closest('.btn-add')) {
-            this.handleAddAction(target);
-        }
-        
-        // Botões de relatório
-        if (target.matches('.btn-report-pdf') || target.closest('.btn-report-pdf')) {
-            this.handleReportGeneration('pdf', target);
-        }
-        
-        if (target.matches('.btn-report-excel') || target.closest('.btn-report-excel')) {
-            this.handleReportGeneration('excel', target);
-        }
-        
-        // Botões de pedidos
-        if (target.matches('.btn-manual-order') || target.closest('.btn-manual-order')) {
-            this.handleManualOrder();
-        }
-        
-        if (target.matches('.btn-mask-order') || target.closest('.btn-mask-order')) {
-            this.handleMaskOrder();
+    },
+
+    async handleUserRegistration(form) {
+        const userData = {
+            nome: form.querySelector('#user-name').value,
+            tamanhoMascara: form.querySelector('select').value,
+            email: form.querySelector('input[type="email"]').value,
+            createdAt: Timestamp.now()
+        };
+
+        try {
+            await DataService.addDocument('usuarios', userData);
+            DOM.showToast('Usuário cadastrado com sucesso!', 'success');
+            form.reset();
+        } catch (error) {
+            console.error('Erro ao cadastrar usuário:', error);
+            DOM.showToast('Erro ao cadastrar usuário.', 'error');
         }
     },
 
     attachMainAppEventListeners() {
-        const appContainer = DOM.qs('#app');
-        if (!appContainer) return;
+        // Logout
+        const logoutBtn = DOM.qs('#logoutButton');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    await AuthService.signOut();
+                    DOM.showToast('Logout realizado com sucesso!', 'success');
+                } catch (error) {
+                    console.error('Erro no logout:', error);
+                    DOM.showToast('Erro ao fazer logout.', 'error');
+                }
+            });
+        }
 
-        appContainer.addEventListener('click', (e) => {
-            const target = e.target;
-            
-            if (target.closest('#logoutButton')) AuthService.signOut();
-            
-            const navTab = target.closest('.nav-tab');
-            if (navTab) this.onNavigate(navTab.dataset.view);
-
-            const notificationBell = target.closest('#notification-bell');
-            if (notificationBell) {
-                const panel = DOM.qs('#notification-panel');
-                if (panel) panel.classList.toggle('hidden');
-            }
+        // Navegação
+        DOM.qsa('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const viewName = tab.dataset.view;
+                this.onNavigate(viewName);
+            });
         });
 
+        // Notificações
+        const notificationBell = DOM.qs('#notification-bell');
+        if (notificationBell) {
+            notificationBell.addEventListener('click', () => {
+                this.updateNotifications();
+            });
+        }
+
+        // Assistente
         const assistantFab = DOM.qs('#assistant-fab');
         if (assistantFab) {
             assistantFab.addEventListener('click', () => {
-                ModalService.showAssistant(AssistantService.processCommand.bind(AssistantService));
+                ModalService.showAssistant((command) => {
+                    return AssistantService.processCommand(command, this.state.user, this.state.data);
+                });
             });
         }
-        
-        const feedbackBtn = DOM.qs('#btn-feedback');
-        if (feedbackBtn) {
-            feedbackBtn.addEventListener('click', () => {
-                DOM.showToast('Funcionalidade de feedback em desenvolvimento', 'info');
+
+        // Verificar máscara
+        const verifyMaskBtn = DOM.qs('#btn-verify-mask');
+        if (verifyMaskBtn) {
+            verifyMaskBtn.addEventListener('click', () => {
+                // Implementar verificação de máscara
+                DOM.showToast('Funcionalidade em desenvolvimento', 'info');
             });
         }
     },
 
-    handleConnectionChange() {
-        const statusDiv = DOM.qs('#connection-status');
-        if (navigator.onLine) {
-            statusDiv.textContent = 'Online';
-            statusDiv.className = 'online show';
-            if (OfflineService.processSyncQueue) {
-                OfflineService.processSyncQueue();
-            }
-        } else {
-            statusDiv.textContent = 'Offline';
-            statusDiv.className = 'offline show';
+    handleGlobalClick(e) {
+        const target = e.target.closest('button') || e.target;
+        
+        // Botões de ação em tabelas
+        if (target.classList.contains('btn-add')) {
+            this.handleAddAction(target);
         }
-        setTimeout(() => statusDiv.classList.remove('show'), 3000);
+        
+        if (target.classList.contains('btn-edit')) {
+            this.handleEditAction(target);
+        }
+        
+        if (target.classList.contains('btn-delete')) {
+            this.handleDeleteAction(target);
+        }
+        
+        // Botões de relatório
+        if (target.classList.contains('btn-report-pdf')) {
+            this.handleReportGeneration(target, 'pdf');
+        }
+        
+        if (target.classList.contains('btn-report-excel')) {
+            this.handleReportGeneration(target, 'excel');
+        }
+        
+        // Botões de pedido
+        if (target.classList.contains('btn-manual-order')) {
+            this.handleManualOrder(target);
+        }
+        
+        if (target.classList.contains('btn-mask-order')) {
+            this.handleMaskOrder(target);
+        }
     },
-    
+
+    handleAddAction(button) {
+        const row = button.closest('tr');
+        const itemName = row.querySelector('td').textContent;
+        
+        ModalService.showConfirmation({
+            title: 'Adicionar ao Estoque',
+            message: `Deseja adicionar mais unidades de "${itemName}"?`,
+            onConfirm: () => {
+                DOM.showToast('Funcionalidade em desenvolvimento', 'info');
+            }
+        });
+    },
+
+    handleEditAction(button) {
+        const row = button.closest('tr');
+        const itemName = row.querySelector('td').textContent;
+        
+        DOM.showToast(`Editando ${itemName}...`, 'info');
+    },
+
+    handleDeleteAction(button) {
+        const row = button.closest('tr');
+        const itemName = row.querySelector('td').textContent;
+        
+        ModalService.showConfirmation({
+            title: 'Confirmar Exclusão',
+            message: `Deseja realmente excluir "${itemName}"?`,
+            onConfirm: () => {
+                DOM.showToast('Item excluído com sucesso!', 'success');
+            }
+        });
+    },
+
+    handleReportGeneration(button, type) {
+        const reportType = button.closest('.bg-white').querySelector('h3').textContent;
+        
+        if (type === 'pdf') {
+            DOM.showToast('Gerando relatório PDF...', 'info');
+        } else {
+            DOM.showToast('Gerando relatório Excel...', 'info');
+        }
+    },
+
+    handleManualOrder(button) {
+        DOM.showToast('Funcionalidade de pedido manual em desenvolvimento', 'info');
+    },
+
+    handleMaskOrder(button) {
+        DOM.showToast('Funcionalidade de pedido de máscaras em desenvolvimento', 'info');
+    },
+
+    handleConnectionChange() {
+        const statusElement = DOM.qs('#connection-status');
+        if (!statusElement) return;
+
+        if (navigator.onLine) {
+            statusElement.textContent = 'Conectado';
+            statusElement.className = 'online show';
+            
+            // Processa fila de sincronização
+            OfflineService.processSyncQueue();
+            
+            setTimeout(() => {
+                statusElement.classList.remove('show');
+            }, 3000);
+        } else {
+            statusElement.textContent = 'Modo Offline';
+            statusElement.className = 'offline show';
+        }
+    },
+
     updateNotifications() {
         const notifications = NotificationService.checkAllNotifications(this.state.data);
         const badge = DOM.qs('#notification-badge');
         const panel = DOM.qs('#notification-panel');
-
-        if (!badge || !panel) return;
-
+        
         if (notifications.length > 0) {
             badge.textContent = notifications.length;
             badge.classList.remove('hidden');
+            
+            const notificationsHtml = notifications.map(notification => `
+                <div class="notification-item" onclick="App.handleNotificationClick('${notification.id}')">
+                    <div class="flex items-center gap-2">
+                        <i class="fas ${notification.icon}"></i>
+                        <div>
+                            <p class="font-semibold text-sm">${notification.title}</p>
+                            <p class="text-xs text-gray-500">${notification.description}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            panel.innerHTML = notificationsHtml;
+            panel.classList.remove('hidden');
         } else {
             badge.classList.add('hidden');
+            panel.classList.add('hidden');
         }
-
-        panel.innerHTML = notifications.length > 0 ? notifications.map(n => `
-            <div class="notification-item flex items-start gap-3" data-notification-id="${n.id}">
-                <i class="fas ${n.icon} mt-1"></i>
-                <div>
-                    <p class="font-semibold text-sm">${n.title}</p>
-                    <p class="text-xs text-gray-500">${n.description}</p>
-                </div>
-            </div>
-        `).join('') : '<p class="p-4 text-sm text-center text-gray-500">Nenhuma notificação.</p>';
-    },
-
-    handleHygieneSubmit(e) {
-        const userSearch = DOM.qs('#user-search').value;
-        const maskSize = DOM.qs('#mask-size').value;
-        const responsible = DOM.qs('#responsible').value;
-        
-        if (!userSearch || !maskSize) {
-            DOM.showToast('Por favor, preencha todos os campos obrigatórios.', 'error');
-            return;
-        }
-        
-        DOM.showToast('Higienização registrada com sucesso!', 'success');
-        // Aqui você adicionaria a lógica para salvar no Firebase
-    },
-    
-    handleUserRegistration(e) {
-        const form = e.target;
-        const formData = new FormData(form);
-        
-        DOM.showToast('Usuário cadastrado com sucesso!', 'success');
-        form.reset();
-        // Aqui você adicionaria a lógica para salvar no Firebase
-    },
-    
-    handleEditAction(target) {
-        DOM.showToast('Funcionalidade de edição em desenvolvimento', 'info');
-    },
-    
-    handleDeleteAction(target) {
-        ModalService.showConfirmation({
-            title: 'Confirmar Exclusão',
-            message: 'Tem certeza que deseja excluir este item?',
-            onConfirm: () => {
-                DOM.showToast('Item excluído com sucesso!', 'success');
-                // Aqui você adicionaria a lógica para excluir do Firebase
-            }
-        });
-    },
-    
-    handleAddAction(target) {
-        DOM.showToast('Funcionalidade de adição em desenvolvimento', 'info');
-    },
-    
-    handleReportGeneration(type, target) {
-        const reportType = type.toUpperCase();
-        DOM.showToast(`Gerando relatório ${reportType}...`, 'info');
-        
-        // Simular geração de relatório
-        setTimeout(() => {
-            DOM.showToast(`Relatório ${reportType} gerado com sucesso!`, 'success');
-        }, 2000);
-    },
-    
-    handleManualOrder() {
-        DOM.showToast('Funcionalidade de pedido manual em desenvolvimento', 'info');
-    },
-    
-    handleMaskOrder() {
-        DOM.showToast('Funcionalidade de pedido de máscaras em desenvolvimento', 'info');
     }
 };
 
-// Make App available globally for other modules
-window.App = App;
-
-// =================================================================================
-// INICIALIZAÇÃO DA APLICAÇÃO
-// =================================================================================
+// Inicializa a aplicação quando a página carregar
 window.addEventListener('load', () => {
     App.init();
 });
+
+// Torna a aplicação globalmente acessível
+window.App = App;

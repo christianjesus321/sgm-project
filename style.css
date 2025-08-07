@@ -1,38 +1,57 @@
+/* =================================================================================
+   SGM - SISTEMA DE GESTÃO DE MÁSCARAS - ESTILOS
+   ================================================================================= */
+
 /* Estilos Globais e Customizações */
 html, body { 
     height: 100%; 
     font-family: 'Inter', sans-serif; 
     scroll-behavior: smooth; 
 }
+
 body { 
     display: flex; 
     flex-direction: column; 
 }
+
 #app { 
     flex-grow: 1; 
 }
+
 .fade-in { 
     animation: fadeIn 0.5s ease-in-out; 
 }
+
 @keyframes fadeIn { 
-    from { opacity: 0; transform: translateY(10px); } 
-    to { opacity: 1; transform: translateY(0); } 
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    } 
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    } 
 }
+
 .tabs { 
     flex-wrap: wrap; 
 }
+
 .nav-tab { 
     border-bottom: 3px solid transparent; 
     transition: all 0.3s ease; 
 }
+
 .nav-tab.active { 
     border-bottom-color: #3b82f6; 
     color: #3b82f6; 
 }
+
 .btn-loading, .btn-loading:hover, button:disabled { 
     opacity: 0.6; 
     cursor: not-allowed; 
 }
+
 .modal-overlay { 
     position: fixed; 
     top: 0; 
@@ -48,10 +67,12 @@ body {
     visibility: hidden; 
     transition: opacity 0.3s ease, visibility 0.3s ease; 
 }
+
 .modal-overlay.active { 
     opacity: 1; 
     visibility: visible; 
 }
+
 .modal-content { 
     background: white; 
     border-radius: 10px; 
@@ -63,12 +84,15 @@ body {
     transform: scale(0.95); 
     transition: transform 0.3s ease; 
 }
+
 .modal-overlay.active .modal-content { 
     transform: scale(1); 
 }
+
 .responsive-table thead { 
     display: none; 
 }
+
 .responsive-table tbody tr { 
     display: block; 
     margin-bottom: 1rem; 
@@ -77,6 +101,7 @@ body {
     box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
     background-color: white; 
 }
+
 .responsive-table tbody td { 
     display: block; 
     text-align: right; 
@@ -84,9 +109,11 @@ body {
     position: relative; 
     border-bottom: 1px solid #e5e7eb; 
 }
+
 .responsive-table tbody td:last-child { 
     border-bottom: none; 
 }
+
 .responsive-table tbody td::before { 
     content: attr(data-label); 
     position: absolute; 
@@ -97,12 +124,29 @@ body {
     font-weight: 600; 
     color: #4b5563; 
 }
+
 @media (min-width: 768px) {
-    .responsive-table thead { display: table-header-group; }
-    .responsive-table tbody tr { display: table-row; }
-    .responsive-table tbody td { display: table-cell; text-align: inherit; padding-left: 0.75rem; position: static; border-bottom: 1px solid #e5e7eb;}
-    .responsive-table tbody td::before { content: none; }
+    .responsive-table thead { 
+        display: table-header-group; 
+    }
+    
+    .responsive-table tbody tr { 
+        display: table-row; 
+    }
+    
+    .responsive-table tbody td { 
+        display: table-cell; 
+        text-align: inherit; 
+        padding-left: 0.75rem; 
+        position: static; 
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .responsive-table tbody td::before { 
+        content: none; 
+    }
 }
+
 #connection-status { 
     position: fixed; 
     bottom: 5rem; 
@@ -115,18 +159,22 @@ body {
     transition: opacity 0.5s, transform 0.5s; 
     opacity: 0; 
 }
+
 #connection-status.show { 
     opacity: 1; 
     transform: translateX(-50%) translateY(0); 
 }
+
 #connection-status.online { 
     background-color: #dcfce7; 
     color: #166534; 
 }
+
 #connection-status.offline { 
     background-color: #fee2e2; 
     color: #991b1b; 
 }
+
 .fab { 
     position: fixed; 
     width: 56px; 
@@ -141,16 +189,19 @@ body {
     cursor: pointer; 
     z-index: 1050; 
     transition: transform 0.2s ease; 
-    display: none; /* Oculto por padrão */
+    display: none; 
 }
+
 .fab:hover { 
     transform: scale(1.1); 
 }
+
 #assistant-fab { 
     bottom: 2rem; 
     right: 2rem; 
     background-color: #2563eb; 
 }
+
 #assistant-response-area { 
     min-height: 100px; 
     max-height: 40vh; 
@@ -164,6 +215,7 @@ body {
     flex-direction: column; 
     gap: 0.75rem; 
 }
+
 .assistant-response-item { 
     padding: 8px 12px; 
     border-radius: 8px; 
@@ -172,6 +224,7 @@ body {
     align-self: flex-start; 
     word-wrap: break-word; 
 }
+
 .user-command-item { 
     padding: 8px 12px; 
     border-radius: 8px; 
@@ -181,10 +234,12 @@ body {
     align-self: flex-end; 
     word-wrap: break-word; 
 }
+
 .timeline { 
     position: relative; 
     padding-left: 30px; 
 }
+
 .timeline::before { 
     content: ''; 
     position: absolute; 
@@ -194,10 +249,12 @@ body {
     width: 2px; 
     background-color: #e5e7eb; 
 }
+
 .timeline-item { 
     position: relative; 
     margin-bottom: 1.5rem; 
 }
+
 .timeline-dot { 
     position: absolute; 
     left: -2px; 
@@ -211,6 +268,7 @@ body {
     justify-content: center; 
     border: 2px solid #3b82f6; 
 }
+
 .timeline-dot::after { 
     content: ''; 
     width: 10px; 
@@ -218,10 +276,12 @@ body {
     background-color: #3b82f6; 
     border-radius: 50%; 
 }
+
 #notification-bell { 
     position: relative; 
     cursor: pointer; 
 }
+
 #notification-badge { 
     position: absolute; 
     top: -5px; 
@@ -238,6 +298,7 @@ body {
     font-weight: bold; 
     border: 2px solid white; 
 }
+
 #notification-panel { 
     position: absolute; 
     top: 100%; 
@@ -251,14 +312,18 @@ body {
     overflow-y: auto; 
     display: none; 
 }
+
 .notification-item { 
     padding: 12px; 
     border-bottom: 1px solid #e5e7eb; 
     cursor: pointer; 
 }
+
 .notification-item:hover { 
     background-color: #f9fafb; 
 }
+
+/* Estilos para Header Fixo */
 #sticky-header {
     position: sticky;
     top: 0;
