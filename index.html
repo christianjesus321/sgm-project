@@ -6,7 +6,7 @@
     <title>S.G.M - Sistema de Gestão de Máscaras</title>
     <meta name="theme-color" content="#3b82f6">
 
-    <!-- Content Security Policy -->
+    <!-- CSP Corrigido para Publicação -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self'; 
         script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://www.gstatic.com;
@@ -28,16 +28,69 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://unpkg.com/dexie@3/dist/dexie.js"></script>
-    
-    <!-- CSS Customizado -->
-    <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* Estilos Globais e Customizações */
+        html, body { height: 100%; font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
+        body { display: flex; flex-direction: column; }
+        #app { flex-grow: 1; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .tabs { flex-wrap: wrap; } /* Correção para as abas */
+        .nav-tab { border-bottom: 3px solid transparent; transition: all 0.3s ease; }
+        .nav-tab.active { border-bottom-color: #3b82f6; color: #3b82f6; }
+        .btn-loading, .btn-loading:hover, button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content { background: white; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; transform: scale(0.95); transition: transform 0.3s ease; }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .responsive-table thead { display: none; }
+        .responsive-table tbody tr { display: block; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); background-color: white; }
+        .responsive-table tbody td { display: block; text-align: right; padding-left: 50%; position: relative; border-bottom: 1px solid #e5e7eb; }
+        .responsive-table tbody td:last-child { border-bottom: none; }
+        .responsive-table tbody td::before { content: attr(data-label); position: absolute; left: 0.75rem; width: 45%; padding-right: 0.75rem; text-align: left; font-weight: 600; color: #4b5563; }
+        @media (min-width: 768px) {
+            .responsive-table thead { display: table-header-group; }
+            .responsive-table tbody tr { display: table-row; }
+            .responsive-table tbody td { display: table-cell; text-align: inherit; padding-left: 0.75rem; position: static; border-bottom: 1px solid #e5e7eb;}
+            .responsive-table tbody td::before { content: none; }
+        }
+        #connection-status { position: fixed; bottom: 5rem; left: 50%; transform: translateX(-50%); padding: 0.5rem 1.5rem; border-radius: 9999px; font-weight: 600; z-index: 2000; transition: opacity 0.5s, transform 0.5s; opacity: 0; }
+        #connection-status.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #connection-status.online { background-color: #dcfce7; color: #166534; }
+        #connection-status.offline { background-color: #fee2e2; color: #991b1b; }
+        .fab { position: fixed; width: 56px; height: 56px; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; z-index: 1050; transition: transform 0.2s ease; display: none; } /* Oculto por padrão */
+        .fab:hover { transform: scale(1.1); }
+        #assistant-fab { bottom: 2rem; right: 2rem; background-color: #2563eb; }
+        #assistant-response-area { min-height: 100px; max-height: 40vh; overflow-y: auto; background-color: #f3f4f6; border-radius: 8px; padding: 12px; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 0.75rem; }
+        .assistant-response-item { padding: 8px 12px; border-radius: 8px; background-color: #e5e7eb; max-width: 85%; align-self: flex-start; word-wrap: break-word; }
+        .user-command-item { padding: 8px 12px; border-radius: 8px; background-color: #dbeafe; color: #1e40af; max-width: 85%; align-self: flex-end; word-wrap: break-word; }
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background-color: #e5e7eb; }
+        .timeline-item { position: relative; margin-bottom: 1.5rem; }
+        .timeline-dot { position: absolute; left: -2px; top: 5px; width: 20px; height: 20px; background-color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #3b82f6; }
+        .timeline-dot::after { content: ''; width: 10px; height: 10px; background-color: #3b82f6; border-radius: 50%; }
+        #notification-bell { position: relative; cursor: pointer; }
+        #notification-badge { position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; background-color: #ef4444; color: white; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; }
+        #notification-panel { position: absolute; top: 100%; right: 0; width: 320px; background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1100; max-height: 400px; overflow-y: auto; display: none; }
+        .notification-item { padding: 12px; border-bottom: 1px solid #e5e7eb; cursor: pointer; }
+        .notification-item:hover { background-color: #f9fafb; }
+        
+        /* Estilos para Header Fixo */
+        #sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background-color: rgba(249, 250, 251, 0.9); /* bg-gray-50 com mais opacidade */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+    </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
 
-    <!-- O contêiner principal da aplicação -->
     <div id="app" class="flex-grow"></div>
     
-    <!-- Rodapé -->
     <footer class="bg-gray-800 text-white text-center p-4 text-sm flex justify-between items-center">
         <span id="footer-text"></span>
         <button id="btn-feedback" class="text-xs text-gray-400 hover:text-white underline">Enviar Feedback</button>
@@ -56,7 +109,3054 @@
     <div id="connection-status"></div>
     <div id="modal-container"></div>
 
-    <!-- JavaScript Principal da Aplicação (agora modularizado) -->
-    <script type="module" src="js/main.js"></script>
+    <script type="module">
+        // =================================================================================
+        // MÓDULO: CONFIGURAÇÃO E INICIALIZAÇÃO DO FIREBASE
+        // =================================================================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, writeBatch, Timestamp, updateDoc, setDoc, getDoc, serverTimestamp, query, orderBy, limit, where, getDocs, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAdCrzegeV4i3tCVzaiDKqzRljtZA7Dh2A",
+            authDomain: "gcontroledehgutl.firebaseapp.com",
+            projectId: "gcontroledehgutl",
+            storageBucket: "gcontroledehgutl.appspot.com",
+            messagingSenderId: "520957417418",
+            appId: "1:520957417418:web:b9694a3ef04d0477826133"
+        };
+
+        const firebaseApp = initializeApp(firebaseConfig);
+        const auth = getAuth(firebaseApp);
+        const db = getFirestore(firebaseApp);
+        
+        const HYGIENE_DEADLINE_DAYS = 120; // 4 meses
+
+        // =================================================================================
+        // MÓDULO: UTILITÁRIOS E SERVIÇOS
+        // =================================================================================
+
+        const DOM = {
+            qs: (selector, parent = document) => parent.querySelector(selector),
+            qsa: (selector, parent = document) => parent.querySelectorAll(selector),
+            render: (selector, html) => {
+                const element = DOM.qs(selector);
+                if (element) element.innerHTML = html;
+            },
+            showToast: (message, type = 'success') => {
+                const toast = DOM.qs('#toast-notification');
+                if (!toast) return;
+                const toastIcon = DOM.qs('#toast-icon');
+                DOM.qs('#toast-message').textContent = message;
+                toast.className = toast.className.replace(/bg-(green|red|yellow)-100 border-(green|red|yellow)-400 text-(green|red|yellow)-700/g, '');
+                toastIcon.className = toastIcon.className.replace(/fa-(check-circle|times-circle|exclamation-triangle)/g, '');
+
+                const types = {
+                    success: { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-700', icon: 'fa-check-circle' },
+                    error: { bg: 'bg-red-100', border: 'border-red-400', text: 'text-red-700', icon: 'fa-times-circle' },
+                    info: { bg: 'bg-yellow-100', border: 'border-yellow-400', text: 'text-yellow-700', icon: 'fa-exclamation-triangle' }
+                };
+                const selectedType = types[type] || types.success;
+                toast.classList.add(selectedType.bg, selectedType.border, selectedType.text);
+                toastIcon.classList.add(selectedType.icon);
+                
+                toast.style.display = 'flex';
+                setTimeout(() => { toast.style.display = 'none'; }, 4000);
+            },
+            toggleFabs: (show) => {
+                const fabs = DOM.qsa('.fab');
+                fabs.forEach(fab => {
+                    fab.style.display = show ? 'flex' : 'none';
+                });
+            }
+        };
+
+        const getUserStatus = (user) => {
+            const getStatus = (date) => {
+                if (!date || typeof date.toDate !== 'function') return { text: 'N/A', class: 'bg-gray-100 text-gray-500', key: 'na' };
+                const d = date.toDate();
+                const now = new Date();
+                const oneMonthFromNow = new Date();
+                oneMonthFromNow.setMonth(now.getMonth() + 1);
+
+                if (d < now) return { text: 'Vencido', class: 'bg-red-100 text-red-700', key: 'vencido' };
+                if (d < oneMonthFromNow) return { text: 'Vence em breve', class: 'bg-yellow-100 text-yellow-700', key: 'breve' };
+                return { text: 'Válido', class: 'bg-green-100 text-green-700', key: 'valido' };
+            };
+            return {
+                test: getStatus(user.dataTeste),
+                mask: getStatus(user.vencimentoMascara)
+            };
+        };
+
+        const PresenceService = {
+            updateIntervalId: null,
+            init: () => {
+                PresenceService.updateStatus('online');
+                PresenceService.updateIntervalId = setInterval(() => PresenceService.updateStatus('online'), 60 * 1000);
+                window.addEventListener('beforeunload', () => PresenceService.updateStatus('offline'));
+            },
+            stop: () => {
+                if (PresenceService.updateIntervalId) {
+                    clearInterval(PresenceService.updateIntervalId);
+                    PresenceService.updateIntervalId = null;
+                }
+            },
+            updateStatus: async (status) => {
+                const user = auth.currentUser;
+                if (!user) return;
+                try {
+                    const statusRef = doc(db, `artifacts/gcontroledehgutl/public/data/userStatus`, user.uid);
+                    await setDoc(statusRef, {
+                        status: status,
+                        lastSeen: serverTimestamp(),
+                        email: user.email,
+                        uid: user.uid
+                    }, { merge: true });
+                } catch (error) {
+                    console.error("Erro ao atualizar status de presença:", error);
+                }
+            }
+        };
+
+        const AuthService = {
+            signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
+            signOut: async () => {
+                await PresenceService.updateStatus('offline');
+                return firebaseSignOut(auth);
+            },
+            listenToAuthChanges: (callback) => {
+                return onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        let role = 'auditor'; // Papel padrão
+                        try {
+                            const roleDocRef = doc(db, 'permissao', user.uid);
+                            const roleDoc = await getDoc(roleDocRef);
+                            if (roleDoc.exists()) {
+                                role = roleDoc.data().role;
+                            } else {
+                                console.warn(`Documento de permissão não encontrado para UID: ${user.uid}. Atribuindo cargo de 'auditor'.`);
+                            }
+                        } catch (error) {
+                            console.error("Erro ao buscar cargo do usuário. Atribuindo cargo de 'auditor'.", error);
+                        }
+                        const userData = { uid: user.uid, email: user.email, isAdmin: (role === 'administrador' || role === 'desenvolvedor'), role };
+                        callback(userData);
+                    } else {
+                        callback(null);
+                    }
+                });
+            },
+            getFriendlyErrorMessage: (error) => {
+                switch (error.code) {
+                    case 'auth/user-not-found': case 'auth/invalid-credential': return 'Credenciais inválidas. Verifique o e-mail e a senha.';
+                    case 'auth/wrong-password': return 'Senha incorreta. Por favor, tente novamente.';
+                    case 'auth/invalid-email': return 'O formato do e-mail é inválido.';
+                    case 'auth/email-already-in-use': return 'Este e-mail já está em uso por outra conta.';
+                    default: return 'Ocorreu um erro. Tente novamente.';
+                }
+            }
+        };
+
+        const OfflineService = {
+            db: null,
+            init() {
+                this.db = new Dexie('GestaoHigienizacaoDB');
+                this.db.version(5).stores({ // Versão incrementada para remover coleções de chat
+                    usuarios: 'userId, nome, pendingSync', 
+                    estoque: 'id, nome, codigo, pendingSync',
+                    historico: 'id, higienizadoEm, userId',
+                    mascarasReserva: 'id, identificacao, pendingSync, &[id+observacoes]',
+                    noticeBoard: 'id, title',
+                    syncQueue: '++id, createdAt',
+                    permissao: 'id, role, nome'
+                });
+            },
+            async getCollection(collectionName) {
+                if (!this.db) this.init();
+                try {
+                    return await this.db[collectionName].toArray();
+                } catch (error) {
+                    console.error(`Erro ao obter coleção local '${collectionName}':`, error);
+                    return []; // Retorna array vazio em caso de erro
+                }
+            },
+            async cacheCollection(collectionName, data) {
+                if (!this.db) this.init();
+                await this.db[collectionName].bulkPut(data);
+            },
+            async addToSyncQueue(collectionName, operation, docId, payload) {
+                if (!this.db) this.init();
+                await this.db.syncQueue.add({ collectionName, operation, docId, payload, createdAt: new Date() });
+                console.log(`[OfflineService] Operação '${operation}' para '${collectionName}' adicionada à fila.`);
+            },
+            async processSyncQueue() {
+                if (!this.db) this.init();
+                const pendingOperations = await this.db.syncQueue.orderBy('createdAt').toArray();
+                if (pendingOperations.length === 0) return;
+
+                DOM.showToast(`Sincronizando ${pendingOperations.length} alterações pendentes...`, 'info');
+
+                for (const op of pendingOperations) {
+                    try {
+                        const { collectionName, operation, docId, payload } = op;
+                        const path = collectionName === 'permissao' ? collectionName : `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+                        
+                        if (operation === 'add') {
+                            await setDoc(doc(db, path, docId), payload);
+                        } else if (operation === 'update') {
+                            if (payload.observacoes && payload.observacoes.isUnion) {
+                                await updateDoc(doc(db, path, docId), {
+                                    observacoes: arrayUnion(...payload.observacoes.elements)
+                                });
+                            } else {
+                                await updateDoc(doc(db, path, docId), payload);
+                            }
+                        } else if (operation === 'delete') {
+                            await deleteDoc(doc(db, path, docId));
+                        }
+                        
+                        await this.db.syncQueue.delete(op.id);
+                        console.log(`[OfflineService] Operação ${op.id} sincronizada com sucesso.`);
+                    } catch (error) {
+                        console.error(`[OfflineService] Falha ao sincronizar operação ${op.id}:`, error);
+                        DOM.showToast(`Falha ao sincronizar uma alteração.`, 'error');
+                    }
+                }
+                DOM.showToast('Sincronização concluída!', 'success');
+            }
+        };
+
+        const DataService = {
+            listenToCollection: (collectionName, callback, customQuery = null) => {
+                const path = collectionName === 'permissao' ? collectionName : `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+                const finalQuery = customQuery ? customQuery : collection(db, path);
+                return onSnapshot(finalQuery, (snapshot) => {
+                    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                    if (!['userStatus'].includes(collectionName)) {
+                        OfflineService.cacheCollection(collectionName, data);
+                    }
+                    callback(data);
+                }, async (error) => {
+                    console.error(`Erro ao ouvir a coleção ${collectionName}:`, error);
+                    const cachedData = await OfflineService.getCollection(collectionName);
+                    callback(cachedData);
+                    DOM.showToast(`Falha ao carregar dados de ${collectionName}. Exibindo dados locais.`, 'error');
+                });
+            },
+            async addDocument(collectionName, data, customPath = null) {
+                if (!navigator.onLine) {
+                    const tempId = `offline_${crypto.randomUUID()}`;
+                    const payload = { ...data, id: tempId, pendingSync: true };
+                    await OfflineService.addToSyncQueue(collectionName, 'add', tempId, data);
+                    return payload;
+                }
+                const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+                const docRef = await addDoc(collection(db, path), data);
+                return { ...data, id: docRef.id };
+            },
+            async updateDocument(collectionName, docId, data, customPath = null) {
+                 if (!navigator.onLine) {
+                    if(data.observacoes && data.observacoes.isUnion) {
+                        await OfflineService.addToSyncQueue(collectionName, 'update', docId, data);
+                    } else {
+                        await OfflineService.addToSyncQueue(collectionName, 'update', docId, data);
+                    }
+                    return { ...data, id: docId, pendingSync: true };
+                }
+                if (data.observacoes && data.observacoes.isUnion) {
+                     const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+                     await updateDoc(doc(db, path, docId), { observacoes: arrayUnion(...data.observacoes.elements) });
+                } else {
+                    const path = customPath || `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+                    await updateDoc(doc(db, path, docId), data);
+                }
+
+                return { ...data, id: docId };
+            },
+            async deleteDocument(collectionName, docId, customPath = null) {
+                const path = customPath ? customPath : `artifacts/gcontroledehgutl/public/data/${collectionName}`;
+                if (!navigator.onLine && customPath !== 'permissao') { // Ações de permissão não devem ser feitas offline
+                    await OfflineService.addToSyncQueue(collectionName, 'delete', docId, {});
+                    return { id: docId, pendingSync: true };
+                }
+                await deleteDoc(doc(db, path, docId));
+                return { id: docId };
+            },
+            async saveRecordAndUpdateStock(recordData, partsToUpdate) {
+                if (!navigator.onLine) {
+                    DOM.showToast('Função indisponível offline. As alterações não serão salvas.', 'error');
+                    throw new Error("Batch operations not supported offline in this version.");
+                }
+                const batch = writeBatch(db);
+                const historyRef = doc(collection(db, `artifacts/gcontroledehgutl/public/data/historico`));
+                batch.set(historyRef, recordData);
+                partsToUpdate.forEach(part => {
+                    const stockRef = doc(db, `artifacts/gcontroledehgutl/public/data/estoque`, part.id);
+                    batch.update(stockRef, { qtd: part.newQty });
+                });
+                return batch.commit();
+            }
+        };
+        
+        const NotificationService = {
+            notifications: [],
+
+            async requestPermission() {
+                if (!("Notification" in window)) {
+                    console.log("Este browser não suporta notificações de desktop");
+                    return;
+                }
+                if (Notification.permission !== "granted") {
+                    await Notification.requestPermission();
+                }
+            },
+
+            showLocalNotification(title, body) {
+                if (Notification.permission === "granted") {
+                    new Notification(title, { body, icon: './favicon.ico' });
+                }
+            },
+            
+            checkAllNotifications(data) {
+                this.notifications = [];
+
+                // 1. Estoque Baixo
+                const lowStockItems = data.estoque.filter(item => item.qtd <= item.qtdMin);
+                if (lowStockItems.length > 0) {
+                    this.notifications.push({
+                        id: 'stock_low',
+                        icon: 'fa-boxes-stacked text-red-500',
+                        title: `${lowStockItems.length} item(ns) com estoque baixo`,
+                        description: `Itens como ${lowStockItems[0].nome} precisam de reposição.`,
+                        action: () => App.onNavigate('Estoque')
+                    });
+                }
+
+                // 2. Higienizações Vencidas
+                const overdueUsers = [];
+                data.usuarios.forEach(u => {
+                    if (!u.createdAt || !u.createdAt.toDate) return;
+                    const lastSanitization = data.historico
+                        .filter(h => h.userId === u.userId)
+                        .sort((a, b) => b.higienizadoEm.toDate() - a.higienizadoEm.toDate())[0];
+                    const referenceDate = lastSanitization ? lastSanitization.higienizadoEm.toDate() : u.createdAt.toDate();
+                    const deadline = new Date();
+                    deadline.setMonth(deadline.getMonth() - 4);
+                    if (referenceDate < deadline) {
+                        overdueUsers.push(u.nome);
+                    }
+                });
+                if (overdueUsers.length > 0) {
+                     this.notifications.push({
+                        id: 'hygiene_overdue',
+                        icon: 'fa-pump-soap text-yellow-500',
+                        title: `${overdueUsers.length} higienizaç${overdueUsers.length > 1 ? 'ões' : 'ão'} vencida(s)`,
+                        description: `Usuários: ${overdueUsers.slice(0, 2).join(', ')}...`,
+                        action: () => App.onNavigate('Dashboard')
+                    });
+                }
+
+                // 3. Vencimentos Próximos (Máscara e Teste)
+                const expiringSoon = [];
+                data.usuarios.forEach(u => {
+                    const statuses = getUserStatus(u);
+                    if (statuses.mask.key === 'breve') {
+                        expiringSoon.push(`${u.nome} (máscara)`);
+                    }
+                    if (statuses.test.key === 'breve') {
+                        expiringSoon.push(`${u.nome} (teste)`);
+                    }
+                });
+                 if (expiringSoon.length > 0) {
+                     this.notifications.push({
+                        id: 'expiring_soon',
+                        icon: 'fa-calendar-times text-blue-500',
+                        title: `${expiringSoon.length} item(ns) vencendo em breve`,
+                        description: `${expiringSoon.slice(0, 2).join(', ')}...`,
+                        action: () => App.onNavigate('GestaoUsuarios')
+                    });
+                }
+
+                return this.notifications;
+            }
+        };
+
+        const AssistantService = {
+            recognition: null,
+            isListening: false,
+
+            initSpeechRecognition() {
+                window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!window.SpeechRecognition) {
+                    console.warn("Speech Recognition não é suportado neste navegador.");
+                    DOM.showToast("Reconhecimento de voz não suportado.", "error");
+                    return;
+                }
+                this.recognition = new SpeechRecognition();
+                this.recognition.lang = 'pt-BR';
+                this.recognition.interimResults = false;
+                this.recognition.maxAlternatives = 1;
+
+                this.recognition.onresult = (event) => {
+                    const speechResult = event.results[0][0].transcript;
+                    const commandInput = DOM.qs('#assistant-command-input');
+                    if (commandInput) {
+                        commandInput.value = speechResult;
+                        commandInput.closest('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }
+                };
+
+                this.recognition.onspeechend = () => {
+                    this.stopListening();
+                };
+                
+                this.recognition.onerror = (event) => {
+                     console.error("Erro no reconhecimento de voz:", event.error);
+                     this.stopListening();
+                     if(event.error !== 'no-speech') {
+                        DOM.showToast("Erro no reconhecimento de voz.", "error");
+                     }
+                };
+            },
+            
+            stopListening() {
+                if (this.recognition && this.isListening) {
+                    this.recognition.stop();
+                }
+                this.isListening = false;
+                const micButton = DOM.qs('#mic-button');
+                if(micButton) micButton.classList.remove('text-red-500', 'animate-pulse');
+            },
+
+            toggleListening() {
+                if (!this.recognition) this.initSpeechRecognition();
+                if (!this.recognition) return;
+
+                if (this.isListening) {
+                    this.stopListening();
+                } else {
+                    try {
+                        this.recognition.start();
+                        this.isListening = true;
+                        const micButton = DOM.qs('#mic-button');
+                        if(micButton) micButton.classList.add('text-red-500', 'animate-pulse');
+                    } catch(e) {
+                        console.error("Erro ao iniciar reconhecimento de voz:", e);
+                        DOM.showToast("Não foi possível iniciar o microfone.", "error");
+                        this.stopListening();
+                    }
+                }
+            },
+            
+            speak(text) {
+                const utterance = new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g, ''));
+                utterance.lang = 'pt-BR';
+                speechSynthesis.speak(utterance);
+            },
+
+            processCommand: async function(command, user, allData) {
+                const cmd = command.toLowerCase().trim();
+                let response = { message: "Não entendi o comando. Tente 'ajuda' para ver a lista de comandos.", status: 'not_found', shouldClose: false };
+
+                const commandMap = [
+                    { regex: /^(?:ajuda|comandos)$/, action: () => {
+                        response = { message: `Aqui estão alguns comandos que entendo: 
+                            <ul class='list-disc list-inside text-sm'>
+                                <li><b>ir para [tela]</b> (ex: ir para estoque)</li>
+                                <li><b>buscar usuário [nome]</b> (ex: buscar usuário christian)</li>
+                                <li><b>registrar higienização de [nome] sem peças</b></li>
+                                <li><b>gerar relatório de [tipo]</b> (ex: gerar relatório de estoque)</li>
+                            </ul>`, status: 'success', shouldClose: false };
+                    }},
+                    { regex: /^(?:ir para|vá para|abrir|mostrar|ver|tela de|tela)\s+(.+)/, action: (matches) => {
+                        const target = matches[1].trim();
+                        const viewMap = {
+                            'dashboard': 'Dashboard', 'início': 'Dashboard', 'inicio': 'Dashboard',
+                            'cadastros': 'Cadastros', 'cadastro': 'Cadastros', 'novo usuário': 'Cadastros',
+                            'higienização': 'Higienizacao', 'higienizacao': 'Higienizacao', 'registrar higienização': 'Higienizacao',
+                            'estoque': 'Estoque', 'peças': 'Estoque', 'pecas': 'Estoque',
+                            'pedidos': 'Pedidos', 'compras': 'Pedidos', 'sugestões': 'Pedidos',
+                            'quadro de avisos': 'QuadroDeAvisos', 'avisos': 'QuadroDeAvisos',
+                            'máscaras': 'MascarasReserva', 'mascaras': 'MascarasReserva', 'máscaras reserva': 'MascarasReserva',
+                            'usuários': 'GestaoUsuarios', 'gestão de usuários': 'GestaoUsuarios', 'usuarios': 'GestaoUsuarios',
+                            'relatórios': 'Relatorios', 'relatorios': 'Relatorios',
+                            'permissões': 'Permissoes', 'permissoes': 'Permissoes'
+                        };
+                        const view = viewMap[target];
+                        if (view) {
+                            if (view === 'Permissoes' && user.role !== 'desenvolvedor') {
+                                response = { message: 'Desculpe, você não tem permissão para acessar esta tela.', status: 'permission_denied', shouldClose: false };
+                            } else {
+                                App.onNavigate(view);
+                                response = { message: `Navegando para ${view}...`, status: 'success', shouldClose: true };
+                            }
+                        }
+                    }},
+                    { regex: /^(?:buscar|procurar|encontrar|pesquisar|achar)\s+usu[aá]rio\s+(.+)/i, action: (matches) => {
+                        const term = matches[1].trim();
+                        const foundUser = allData.usuarios.find(u => u.nome.toLowerCase().includes(term));
+                        
+                        if (foundUser) {
+                            App.onNavigate('GestaoUsuarios', { searchTerm: term });
+                            response = { message: `Buscando por "${term}" em Gestão de Usuários...`, status: 'success', shouldClose: true };
+                        } else {
+                            response = { message: `Não encontrei nenhum usuário com o nome parecido com "${term}".`, status: 'not_found', shouldClose: false };
+                        }
+                    }},
+                    { regex: /^(?:registrar|registra|lançar|lança)\s+higieniza[cç][aã]o\s+(?:para|de)\s+(.+?)\s+sem\s+(?:pe[cç]as|troca de pe[cç]as)/i, async action(matches) {
+                        const userNameToFind = matches[1].trim();
+                        const targetUser = allData.usuarios.find(u => u.nome.toLowerCase().includes(userNameToFind));
+
+                        if (!targetUser) {
+                            response = { message: `Usuário "${userNameToFind}" não encontrado.`, status: 'error', shouldClose: false };
+                            return;
+                        }
+
+                        const registro = {
+                            userId: targetUser.userId,
+                            userName: targetUser.nome,
+                            tamanhoMascara: targetUser.tamanhoMascara,
+                            pecasTrocadas: [],
+                            responsavel: user.email,
+                            higienizadoEm: Timestamp.now(),
+                            report: "Registrado via comando de voz"
+                        };
+                        
+                        try {
+                            await DataService.saveRecordAndUpdateStock(registro, []);
+                            response = { message: `Higienização para ${targetUser.nome} registrada com sucesso.`, status: 'success', shouldClose: true };
+                        } catch (error) {
+                            console.error("Erro ao registrar higienização por voz:", error);
+                            response = { message: `Ocorreu um erro ao registrar a higienização.`, status: 'error', shouldClose: false };
+                        }
+                    }},
+                    { regex: /^(?:gerar relat[oó]rio de)\s+(.+)/, action: (matches) => {
+                        const type = matches[1].trim();
+                        if (type.includes('estoque') || type.includes('peças') || type.includes('higieniza')) {
+                            App.onNavigate('Relatorios');
+                            response = { message: 'Navegando para Relatórios. Você pode gerar o relatório desejado lá.', status: 'success', shouldClose: true };
+                        }
+                    }},
+                ];
+                
+                for (const { regex, action } of commandMap) {
+                    const matches = cmd.match(regex);
+                    if (matches) {
+                        await action(matches);
+                        break; 
+                    }
+                }
+                
+                this.speak(response.message);
+                return response;
+            }
+        };
+
+        const ModalService = {
+            showConfirmation: ({ title, message, onConfirm }) => {
+                const modalHtml = `
+                <div id="confirmationModal" class="modal-overlay active">
+                    <div class="modal-content p-6 text-center">
+                        <h3 class="text-xl font-bold mb-4">${title}</h3>
+                        <p class="mb-6 text-gray-600">${message}</p>
+                        <div class="flex justify-center gap-4">
+                            <button id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                            <button id="modal-btn-confirm" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Confirmar</button>
+                        </div>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#modal-btn-confirm').addEventListener('click', () => {
+                    onConfirm();
+                    ModalService.close();
+                });
+            },
+            showRecipientModal({ title, currentUserEmail, onConfirm }) {
+                const modalHtml = `
+                <div id="recipientModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">${title}</h3>
+                        <form id="formRecipient" class="space-y-4">
+                            <div>
+                                <label for="recipient-name" class="block font-semibold mb-1">Destinatário</label>
+                                <input type="text" id="recipient-name" class="w-full p-2 border rounded-lg" value="${currentUserEmail}" required>
+                                <p class="text-xs text-gray-500 mt-1">Este nome/e-mail aparecerá no cabeçalho do PDF.</p>
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirmar & Gerar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formRecipient').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const recipientName = DOM.qs('#recipient-name').value;
+                    onConfirm(recipientName);
+                    ModalService.close();
+                });
+            },
+            showAssistant(onConfirm) {
+                const modalHtml = `
+                <div id="assistantModal" class="modal-overlay active">
+                    <div class="modal-content p-6 flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-robot text-blue-600"></i>Assistente C.J.7</h3>
+                            <button id="modal-btn-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                        </div>
+                        <div id="assistant-response-area" class="mb-4"></div>
+                        <form id="formAssistant" class="flex gap-2 mt-auto">
+                            <button type="button" id="mic-button" title="Comando de Voz" class="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors"><i class="fas fa-microphone"></i></button>
+                            <input type="text" id="assistant-command-input" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Digite 'ajuda' para ver comandos..." required autocomplete="off">
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold"><i class="fas fa-paper-plane"></i></button>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                const form = DOM.qs('#formAssistant');
+                const input = DOM.qs('#assistant-command-input');
+                const responseArea = DOM.qs('#assistant-response-area');
+                let conversationHistory = [{ type: 'assistant', text: 'Olá! Sou o C.J.7, seu assistente. Como posso ajudar? Digite "ajuda" para ver uma lista de comandos ou use o microfone.' }];
+
+                const renderConversation = () => {
+                    responseArea.innerHTML = conversationHistory.map(entry => {
+                        if (entry.type === 'user') {
+                            return `<div class="user-command-item"><i class="fas fa-user mr-2 text-gray-400"></i>${entry.text}</div>`;
+                        }
+                        return `<div class="assistant-response-item"><i class="fas fa-robot mr-2 text-blue-500"></i>${entry.text}</div>`;
+                    }).join('');
+                    responseArea.scrollTop = responseArea.scrollHeight;
+                };
+                
+                renderConversation();
+                input.focus();
+                DOM.qs('#modal-btn-close').addEventListener('click', () => {
+                    AssistantService.stopListening();
+                    ModalService.close();
+                });
+                DOM.qs('#mic-button').addEventListener('click', () => AssistantService.toggleListening());
+                
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const command = input.value;
+                    if (!command) return;
+
+                    AssistantService.stopListening();
+                    input.disabled = true;
+                    form.querySelector('button[type="submit"]').disabled = true;
+
+                    conversationHistory.push({ type: 'user', text: command });
+                    conversationHistory.push({ type: 'assistant', text: '<i class="fas fa-spinner fa-spin"></i>' });
+                    renderConversation();
+
+                    const response = await onConfirm(command, App.state.user, App.state.data);
+
+                    conversationHistory.pop();
+                    conversationHistory.push({ type: 'assistant', text: response.message });
+                    renderConversation();
+                    
+                    if (response.shouldClose) {
+                        setTimeout(() => ModalService.close(), 2000);
+                    } else {
+                        input.value = '';
+                        input.disabled = false;
+                        form.querySelector('button[type="submit"]').disabled = false;
+                        input.focus();
+                    }
+                });
+            },
+            showQRCode: ({ title, data }) => {
+                const typeNumber = 4;
+                const errorCorrectionLevel = 'L';
+                const qr = qrcode(typeNumber, errorCorrectionLevel);
+                qr.addData(data);
+                qr.make();
+                
+                const modalHtml = `
+                <div id="qrCodeModal" class="modal-overlay active">
+                    <div class="modal-content p-6 text-center">
+                         <div class="flex justify-between items-center mb-4">
+                             <h3 class="text-xl font-bold">${title}</h3>
+                             <button id="modal-btn-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                         </div>
+                        <div id="qr-container" class="flex justify-center">${qr.createImgTag(6, 8)}</div>
+                        <p class="mt-4 text-sm text-gray-500 break-all">ID: ${data}</p>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-close').addEventListener('click', () => ModalService.close());
+            },
+            showScanner: (onScanSuccess) => {
+                const modalHtml = `
+                <div id="scannerModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">Escanear QR Code</h3>
+                            <button id="modal-btn-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                        </div>
+                        <div id="qr-reader" class="w-full border"></div>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                const html5QrCode = new Html5Qrcode("qr-reader");
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                
+                let isScanningActive = false;
+
+                const stopScanning = () => {
+                    if (isScanningActive && html5QrCode.isScanning) {
+                         html5QrCode.stop().catch(err => {
+                            console.warn("Erro suprimido ao parar o scanner:", err);
+                        });
+                        isScanningActive = false;
+                    }
+                };
+
+                const closeAndCleanup = () => {
+                    stopScanning();
+                    ModalService.close();
+                };
+
+                DOM.qs('#modal-btn-close').addEventListener('click', closeAndCleanup);
+                
+                html5QrCode.start({ facingMode: "environment" }, config, 
+                    (decodedText, decodedResult) => {
+                        stopScanning();
+                        onScanSuccess(decodedText);
+                    },
+                    (errorMessage) => { /* ignora erros de 'not found' */ }
+                ).then(() => {
+                    isScanningActive = true;
+                }).catch(err => {
+                    DOM.showToast('Falha ao iniciar a câmera. Verifique as permissões.', 'error');
+                    console.error("Erro no scanner:", err);
+                    closeAndCleanup();
+                });
+            },
+            showLoanModal: ({ mask, users, onConfirm }) => {
+                const userOptions = users.map(u => `<option value="${u.userId}">${u.nome}</option>`).join('');
+                const modalHtml = `
+                <div id="loanModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Emprestar Máscara: ${mask.identificacao}</h3>
+                        <form id="formLoan" class="space-y-4">
+                            <div><label for="loan-user" class="block font-semibold mb-1">Emprestar para:</label><select id="loan-user" class="w-full p-2 border rounded-lg" required><option value="">Selecione...</option>${userOptions}</select></div>
+                            <div><label for="loan-delivery-date" class="block font-semibold mb-1">Data de Entrega:</label><input type="date" id="loan-delivery-date" class="w-full p-2 border rounded-lg" required></div>
+                            <div><label for="loan-return-date" class="block font-semibold mb-1">Data Prevista de Devolução:</label><input type="date" id="loan-return-date" class="w-full p-2 border rounded-lg" required></div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirmar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formLoan').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const userId = DOM.qs('#loan-user').value;
+                    const userName = DOM.qs('#loan-user').options[DOM.qs('#loan-user').selectedIndex].text;
+                    const deliveryDate = DOM.qs('#loan-delivery-date').value;
+                    const returnDate = DOM.qs('#loan-return-date').value;
+
+                    if (!userId || !deliveryDate || !returnDate) {
+                        DOM.showToast('Todos os campos são obrigatórios.', 'error');
+                        return;
+                    }
+                    onConfirm({ userId, userName, deliveryDate, returnDate });
+                    ModalService.close();
+                });
+            },
+            showAddStockModal: ({ peca, onConfirm }) => {
+                const modalHtml = `
+                <div id="addStockModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Adicionar ao Estoque: ${peca.nome}</h3>
+                        <form id="formAddStock" class="space-y-4">
+                            <div><label for="add-stock-qty" class="block font-semibold mb-1">Quantidade a Adicionar:</label><input type="number" id="add-stock-qty" class="w-full p-2 border rounded-lg" required min="1"></div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Adicionar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formAddStock').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const quantity = parseInt(DOM.qs('#add-stock-qty').value, 10);
+                    if (isNaN(quantity) || quantity <= 0) {
+                        DOM.showToast('Por favor, insira uma quantidade válida.', 'error');
+                        return;
+                    }
+                    onConfirm(quantity);
+                    ModalService.close();
+                });
+            },
+            showFeedbackModal(onConfirm) {
+                const modalHtml = `
+                <div id="feedbackModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Enviar Feedback</h3>
+                        <form id="formFeedback" class="space-y-4">
+                            <div><label for="feedback-text" class="block font-semibold mb-1">Sua sugestão ou observação:</label><textarea id="feedback-text" class="w-full p-2 border rounded-lg" rows="4" required></textarea></div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Enviar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formFeedback').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const text = DOM.qs('#feedback-text').value;
+                    if (text.trim()) {
+                        onConfirm(text.trim());
+                        ModalService.close();
+                    }
+                });
+            },
+            showEditStockModal({ item, onConfirm }) {
+                const modalHtml = `
+                <div id="editStockModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Editar Item de Estoque</h3>
+                        <form id="formEditStock" class="space-y-4">
+                            <div><label for="edit-stock-name" class="block font-semibold mb-1">Nome da Peça</label><input type="text" id="edit-stock-name" class="w-full p-2 border rounded-lg" value="${item.nome}" required></div>
+                            <div><label for="edit-stock-code" class="block font-semibold mb-1">Código</label><input type="text" id="edit-stock-code" class="w-full p-2 border rounded-lg" value="${item.codigo}" required></div>
+                            <div><label for="edit-stock-min-qty" class="block font-semibold mb-1">Quantidade Mínima</label><input type="number" id="edit-stock-min-qty" class="w-full p-2 border rounded-lg" value="${item.qtdMin}" required min="0"></div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formEditStock').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const updatedData = {
+                        nome: DOM.qs('#edit-stock-name').value,
+                        codigo: DOM.qs('#edit-stock-code').value,
+                        qtdMin: parseInt(DOM.qs('#edit-stock-min-qty').value, 10)
+                    };
+                    onConfirm(updatedData);
+                    ModalService.close();
+                });
+            },
+            showEditUserModal({ user, onConfirm }) {
+                const setores = ['Ectos', 'Endos', 'EAR Tag', 'Outros'];
+                const setoresHtml = setores.map(setor => `
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" name="setores" value="${setor}" class="h-4 w-4 rounded border-gray-300" ${user.setores?.includes(setor) ? 'checked' : ''}>
+                        <span>${setor}</span>
+                    </label>`).join('');
+                const dataTeste = user.dataTeste?.toDate().toISOString().split('T')[0] || '';
+                const vencimentoMascara = user.vencimentoMascara?.toDate().toISOString().split('T')[0] || '';
+
+                const modalHtml = `
+                <div id="editUserModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Editar Usuário</h3>
+                        <form id="formEditUser" class="space-y-4">
+                            <div><label class="block font-semibold mb-1">Nome</label><input type="text" id="edit-user-name" class="w-full p-2 border rounded-lg" value="${user.nome}" required oninput="this.value = this.value.toUpperCase()"></div>
+                            <div><label class="block font-semibold mb-1">Tamanho da Máscara</label>
+                                <select id="edit-user-mask-size" class="w-full p-2 border rounded-lg">
+                                    <option ${user.tamanhoMascara === 'P' ? 'selected' : ''}>P</option>
+                                    <option ${user.tamanhoMascara === 'M' ? 'selected' : ''}>M</option>
+                                    <option ${user.tamanhoMascara === 'G' ? 'selected' : ''}>G</option>
+                                </select>
+                            </div>
+                            <div><label class="block font-semibold mb-2">Setores</label><div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${setoresHtml}</div></div>
+                            <div><label class="block font-semibold mb-1">Data De Vencimento do Teste De Vedação</label><input type="date" id="edit-user-test-date" class="w-full p-2 border rounded-lg" value="${dataTeste}" required></div>
+                            <div><label class="block font-semibold mb-1">Vencimento Máscara</label><input type="date" id="edit-user-mask-expiry" class="w-full p-2 border rounded-lg" value="${vencimentoMascara}" required></div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formEditUser').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const updatedData = {
+                        nome: DOM.qs('#edit-user-name').value.toUpperCase(),
+                        tamanhoMascara: DOM.qs('#edit-user-mask-size').value,
+                        setores: [...DOM.qsa('input[name="setores"]:checked')].map(el => el.value),
+                        dataTeste: Timestamp.fromDate(new Date(DOM.qs('#edit-user-test-date').value)),
+                        vencimentoMascara: Timestamp.fromDate(new Date(DOM.qs('#edit-user-mask-expiry').value))
+                    };
+                    onConfirm(updatedData);
+                    ModalService.close();
+                });
+            },
+            showNewNoticeModal({ onConfirm, users, permissions }) {
+                const permissionsMap = new Map(permissions.map(p => [p.id, p.role]));
+                const usersWithRoles = users
+                    .map(u => ({ ...u, role: permissionsMap.get(u.id) }))
+                    .filter(u => u.role); 
+
+                const usersByRole = usersWithRoles.reduce((acc, user) => {
+                    const role = user.role;
+                    if (!acc[role]) acc[role] = [];
+                    acc[role].push(user);
+                    return acc;
+                }, {});
+
+                const userOptGroups = Object.keys(usersByRole).sort().map(role => {
+                    const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                    return `
+                    <optgroup label="${roleLabel}s">
+                        ${usersByRole[role].map(u => `<option value="${u.id}">${u.nome}</option>`).join('')}
+                    </optgroup>
+                `}).join('');
+                
+                const roles = [...new Set(permissions.map(p => p.role))];
+                const roleOptions = roles.map(role => {
+                    const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+                    return `<option value="role:${role}">Todos os ${roleLabel}s</option>`
+                }).join('');
+
+                const modalHtml = `
+                <div id="newNoticeModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Criar Novo Aviso</h3>
+                        <form id="formNewNotice" class="space-y-4">
+                            <div><label for="notice-title" class="block font-semibold">Título</label><input type="text" id="notice-title" class="w-full p-2 border rounded-lg" required></div>
+                            <div><label for="notice-desc" class="block font-semibold">Descrição</label><textarea id="notice-desc" class="w-full p-2 border rounded-lg" rows="3" required></textarea></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label for="notice-type" class="block font-semibold">Tipo</label><select id="notice-type" class="w-full p-2 border rounded-lg"><option>Tarefa</option><option>Solicitação</option><option>Bug</option></select></div>
+                                <div><label for="notice-status" class="block font-semibold">Status</label><select id="notice-status" class="w-full p-2 border rounded-lg"><option>Não Resolvido</option><option>Em Andamento</option><option>Resolvido</option></select></div>
+                            </div>
+                            <div>
+                                <label class="block font-semibold">Visibilidade</label>
+                                <div class="flex gap-4 mt-1"><label><input type="radio" name="visibility" value="public" checked> Público</label><label><input type="radio" name="visibility" value="private"> Privado</label></div>
+                            </div>
+                            <div id="private-options" class="hidden">
+                                <label for="notice-recipients" class="block font-semibold">Destinatários</label>
+                                <select id="notice-recipients" class="w-full p-2 border rounded-lg" multiple>
+                                    <optgroup label="Grupos de Cargos">${roleOptions}</optgroup>
+                                    ${userOptGroups}
+                                </select>
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Criar Aviso</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qsa('input[name="visibility"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        DOM.qs('#private-options').classList.toggle('hidden', e.target.value === 'public');
+                    });
+                });
+                DOM.qs('#formNewNotice').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const isPublic = DOM.qs('input[name="visibility"]:checked').value === 'public';
+                    
+                    let recipients = new Set();
+                    if (!isPublic) {
+                        const selectedOptions = [...DOM.qs('#notice-recipients').selectedOptions];
+                        selectedOptions.forEach(opt => {
+                            if (opt.value.startsWith('role:')) {
+                                const role = opt.value.replace('role:', '');
+                                permissions.filter(p => p.role === role).forEach(p => recipients.add(p.id));
+                            } else {
+                                recipients.add(opt.value);
+                            }
+                        });
+                    }
+                    
+                    const noticeData = {
+                        title: DOM.qs('#notice-title').value,
+                        description: DOM.qs('#notice-desc').value,
+                        type: DOM.qs('#notice-type').value,
+                        status: DOM.qs('#notice-status').value,
+                        isPublic: isPublic,
+                        recipients: [...recipients],
+                        resolution: ''
+                    };
+                    onConfirm(noticeData);
+                    ModalService.close();
+                });
+            },
+            showEditNoticeModal({ notice, onConfirm }) {
+                const modalHtml = `
+                <div id="editNoticeModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Editar Aviso</h3>
+                        <form id="formEditNotice" class="space-y-4">
+                            <div><label for="edit-notice-title" class="block font-semibold">Título</label><input type="text" id="edit-notice-title" class="w-full p-2 border rounded-lg" required value="${notice.title}"></div>
+                            <div><label for="edit-notice-desc" class="block font-semibold">Descrição</label><textarea id="edit-notice-desc" class="w-full p-2 border rounded-lg" rows="3" required>${notice.description}</textarea></div>
+                            <div>
+                                <label for="notice-resolution-update" class="block font-semibold">Descrição da Resolução</label>
+                                <textarea id="notice-resolution-update" class="w-full p-2 border rounded-lg" rows="4" placeholder="Descreva como a tarefa foi resolvida...">${notice.resolution || ''}</textarea>
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formEditNotice').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const updatedData = {
+                        title: DOM.qs('#edit-notice-title').value,
+                        description: DOM.qs('#edit-notice-desc').value,
+                        resolution: DOM.qs('#notice-resolution-update').value,
+                    };
+                    onConfirm(updatedData);
+                    ModalService.close();
+                });
+            },
+            showUpdateNoticeModal({ notice, onConfirm }) {
+                const modalHtml = `
+                <div id="updateNoticeModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-1">Atualizar Status da Tarefa</h3>
+                        <p class="text-sm text-gray-500 mb-4">${notice.title}</p>
+                        <form id="formUpdateNotice" class="space-y-4">
+                            <div>
+                                <label for="notice-status-update" class="block font-semibold">Status</label>
+                                <select id="notice-status-update" class="w-full p-2 border rounded-lg">
+                                    <option ${notice.status === 'Não Resolvido' ? 'selected' : ''}>Não Resolvido</option>
+                                    <option ${notice.status === 'Em Andamento' ? 'selected' : ''}>Em Andamento</option>
+                                    <option ${notice.status === 'Resolvido' ? 'selected' : ''}>Resolvido</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="notice-resolution-update" class="block font-semibold">Descrição da Resolução</label>
+                                <textarea id="notice-resolution-update" class="w-full p-2 border rounded-lg" rows="4" placeholder="Descreva como a tarefa foi resolvida...">${notice.resolution || ''}</textarea>
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formUpdateNotice').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const updatedData = {
+                        status: DOM.qs('#notice-status-update').value,
+                        resolution: DOM.qs('#notice-resolution-update').value,
+                    };
+                    onConfirm(updatedData);
+                    ModalService.close();
+                });
+            },
+            showUserHistoryModal({ userName, history, onExport }) {
+                const historyHtml = history.length > 0 ? history.map(item => `
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="ml-8 bg-gray-100 p-3 rounded-lg shadow-sm">
+                            <p class="font-semibold text-gray-800">Higienização em: ${item.higienizadoEm.toDate().toLocaleDateString('pt-BR')}</p>
+                            <p class="text-sm mt-2"><b>Peças Trocadas:</b> ${(item.pecasTrocadas && item.pecasTrocadas.length > 0) ? item.pecasTrocadas.map(p => `${p.nome} (x${p.qtd})`).join(', ') : 'Nenhuma'}</p>
+                            <p class="text-sm mt-1"><b>Observações:</b> ${item.report || 'Nenhuma'}</p>
+                            <p class="text-xs text-gray-500 mt-2">Responsável: ${item.responsavel}</p>
+                        </div>
+                    </div>
+                `).join('') : '<p class="text-center text-gray-500 p-4">Nenhum histórico de higienização encontrado para este usuário.</p>';
+                
+                const modalHtml = `
+                <div id="userHistoryModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-history text-purple-600"></i> Histórico de ${userName}</h3>
+                            <button id="modal-btn-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                        </div>
+                        <div class="timeline max-h-[60vh] overflow-y-auto pr-2">${historyHtml}</div>
+                        <div class="flex justify-end gap-4 pt-4 mt-4 border-t">
+                            <button id="modal-btn-close-2" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Fechar</button>
+                            ${history.length > 0 ? `<button id="btn-export-history-pdf" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"><i class="fas fa-file-pdf"></i>Exportar PDF</button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-close').addEventListener('click', () => this.close());
+                DOM.qs('#modal-btn-close-2').addEventListener('click', () => this.close());
+                if (history.length > 0) {
+                    DOM.qs('#btn-export-history-pdf').addEventListener('click', onExport);
+                }
+            },
+            showNewReserveMaskModal({ onConfirm }) {
+                const modalHtml = `
+                <div id="newReserveMaskModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Nova Máscara de Reserva</h3>
+                        <form id="formNewReserveMask" class="space-y-4">
+                            <div>
+                                <label for="mask-identificacao" class="block font-semibold">Identificação</label>
+                                <input type="text" id="mask-identificacao" class="w-full p-2 border rounded-lg" required placeholder="Ex: M-001">
+                            </div>
+                            <div>
+                                <label for="mask-tamanho" class="block font-semibold">Tamanho</label>
+                                <select id="mask-tamanho" class="w-full p-2 border rounded-lg">
+                                    <option>P</option>
+                                    <option>M</option>
+                                    <option>G</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Salvar Máscara</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                DOM.qs('#formNewReserveMask').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const identificacao = DOM.qs('#mask-identificacao').value;
+                    const tamanho = DOM.qs('#mask-tamanho').value;
+                    if (identificacao.trim()) {
+                        onConfirm({ identificacao, tamanho });
+                        ModalService.close();
+                    } else {
+                        DOM.showToast('A identificação é obrigatória.', 'error');
+                    }
+                });
+            },
+            showMaskDetailsModal({ mask, user, history, expiryDate }) {
+                const getStatusClass = (m) => m.status === 'Disponível' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700';
+                const now = new Date();
+                const isExpired = expiryDate < now;
+
+                const historyHtml = history.length > 0 ? history.map(h => `
+                    <li class="border-t p-2">
+                        <p class="text-sm">Higienizado em: <span class="font-semibold">${h.higienizadoEm.toDate().toLocaleDateString('pt-BR')}</span></p>
+                        <p class="text-xs text-gray-500">Responsável: ${h.responsavel}</p>
+                    </li>
+                `).join('') : '<li class="p-2 text-sm text-gray-500">Nenhum histórico de higienização para este usuário.</li>';
+                
+                const modalHtml = `
+                <div id="maskDetailsModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <div class="flex justify-between items-center mb-4 border-b pb-3">
+                            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-mask-face text-blue-600"></i> ${mask.identificacao}</h3>
+                            <button id="modal-btn-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold">Status:</span>
+                                <span class="px-3 py-1 rounded-full text-sm font-bold ${getStatusClass(mask)}">${mask.status}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold">Tamanho:</span>
+                                <span class="text-gray-700">${mask.tamanho}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold">Validade:</span>
+                                <span class="${isExpired ? 'text-red-600 font-bold' : 'text-gray-700'}">${expiryDate.toLocaleDateString('pt-BR')} ${isExpired ? '(Vencida)' : ''}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold">Usuário Atual:</span>
+                                <span class="text-gray-700">${user ? user.nome : 'N/A'}</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold mt-4 mb-2">Histórico de Higienização (Usuário Atual)</h4>
+                                <ul class="bg-gray-50 rounded-lg max-h-40 overflow-y-auto">${historyHtml}</ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-close').addEventListener('click', () => ModalService.close());
+            },
+            async showMaskVerificationScanner({ getLocalData }) {
+                this.showScanner(async (scannedId) => {
+                    ModalService.close();
+                    
+                    setTimeout(async () => {
+                        const { mascaras, usuarios, historico } = await getLocalData();
+                        const mask = mascaras.find(m => m.id === scannedId);
+
+                        if (!mask) {
+                            DOM.showToast('QR Code inválido ou máscara não encontrada.', 'error');
+                            return;
+                        }
+
+                        const user = mask.currentUserId ? usuarios.find(u => u.userId === mask.currentUserId) : null;
+                        
+                        const maskHistory = user ? historico
+                            .filter(h => h.userId === user.userId)
+                            .map(h => ({...h, higienizadoEm: new Timestamp(h.higienizadoEm.seconds, h.higienizadoEm.nanoseconds) }))
+                            .sort((a, b) => b.higienizadoEm.toDate() - a.higienizadoEm.toDate())
+                            .slice(0, 10) : [];
+                        
+                        const createdAtDate = mask.createdAt?.toDate ? mask.createdAt.toDate() : (mask.createdAt ? new Date(mask.createdAt) : new Date());
+                        const expiryDate = new Date(createdAtDate);
+                        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+                        ModalService.showMaskDetailsModal({ mask, user, history: maskHistory, expiryDate });
+                    }, 200);
+                });
+            },
+            showMaskObservationsModal({ mask, onConfirm }) {
+                const observations = mask.observacoes || [];
+                const timelineHtml = observations.length > 0 
+                    ? observations.sort((a,b) => b.timestamp.seconds - a.timestamp.seconds).map(obs => `
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="ml-8 bg-gray-100 p-3 rounded-lg">
+                                <p class="text-sm">${obs.text}</p>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Por: ${obs.authorEmail} em ${new Date(obs.timestamp.seconds * 1000).toLocaleString('pt-BR')}
+                                </p>
+                            </div>
+                        </div>
+                    `).join('')
+                    : '<p class="text-gray-500 text-center">Nenhuma observação registrada.</p>';
+
+                const modalHtml = `
+                <div id="observationsModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">Observações de ${mask.identificacao}</h3>
+                             <button id="modal-btn-close" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                        </div>
+                        <div class="timeline max-h-60 overflow-y-auto pr-4 mb-4">${timelineHtml}</div>
+                        <form id="formNewObservation">
+                            <label for="new-observation-text" class="font-semibold block mb-2">Adicionar Nova Observação</label>
+                            <textarea id="new-observation-text" rows="3" class="w-full p-2 border rounded-lg" required></textarea>
+                            <div class="text-right mt-4">
+                                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700">Adicionar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+
+                DOM.qs('#modal-btn-close').addEventListener('click', () => this.close());
+                DOM.qs('#formNewObservation').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const text = DOM.qs('#new-observation-text').value;
+                    if (text.trim()) {
+                        onConfirm(text.trim());
+                    }
+                });
+            },
+             showManualPartsOrderModal({ estoque, onConfirm }) {
+                const stockItemsHtml = estoque.map(item => `
+                    <div class="flex justify-between items-center p-2 border-b">
+                        <label for="part-${item.id}" class="flex-grow">${item.nome} <span class="text-xs text-gray-500">(${item.codigo})</span></label>
+                        <input type="number" id="part-${item.id}" data-id="${item.id}" class="w-20 p-1 border rounded text-center" min="0" placeholder="0">
+                    </div>
+                `).join('');
+
+                const modalHtml = `
+                <div id="manualPartsOrderModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Pedido de Compra Manual de Peças</h3>
+                        <form id="formManualPartsOrder">
+                            <div class="max-h-80 overflow-y-auto space-y-2 mb-4 pr-2">${stockItemsHtml}</div>
+                            <div class="flex justify-end gap-4 pt-4 border-t">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Gerar Pedido</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => this.close());
+                DOM.qs('#formManualPartsOrder').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const items = [...DOM.qsa('#formManualPartsOrder input[type="number"]')]
+                        .map(input => ({ id: input.dataset.id, qtdSugerida: parseInt(input.value, 10) || 0 }))
+                        .filter(item => item.qtdSugerida > 0)
+                        .map(item => {
+                            const peca = estoque.find(p => p.id === item.id);
+                            return { ...peca, ...item };
+                        });
+                    
+                    if (items.length > 0) {
+                        onConfirm(items);
+                    } else {
+                        DOM.showToast('Nenhum item selecionado para o pedido.', 'info');
+                    }
+                });
+            },
+            showManualMasksOrderModal({ onConfirm }) {
+                const modalHtml = `
+                <div id="manualMasksOrderModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Pedido de Compra Manual de Máscaras</h3>
+                        <form id="formManualMasksOrder" class="space-y-4">
+                            <div>
+                                <label for="mask-p-qty" class="block font-semibold">Tamanho P</label>
+                                <input type="number" id="mask-p-qty" class="w-full p-2 border rounded" min="0" placeholder="0">
+                            </div>
+                            <div>
+                                <label for="mask-m-qty" class="block font-semibold">Tamanho M</label>
+                                <input type="number" id="mask-m-qty" class="w-full p-2 border rounded" min="0" placeholder="0">
+                            </div>
+                            <div>
+                                <label for="mask-g-qty" class="block font-semibold">Tamanho G</label>
+                                <input type="number" id="mask-g-qty" class="w-full p-2 border rounded" min="0" placeholder="0">
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4 border-t">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Gerar Pedido</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => this.close());
+                DOM.qs('#formManualMasksOrder').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const items = [
+                        { size: 'P', quantity: parseInt(DOM.qs('#mask-p-qty').value, 10) || 0 },
+                        { size: 'M', quantity: parseInt(DOM.qs('#mask-m-qty').value, 10) || 0 },
+                        { size: 'G', quantity: parseInt(DOM.qs('#mask-g-qty').value, 10) || 0 }
+                    ].filter(item => item.quantity > 0);
+
+                    if (items.length > 0) {
+                        onConfirm(items);
+                    } else {
+                        DOM.showToast('Nenhuma quantidade especificada.', 'info');
+                    }
+                });
+            },
+            showEditPermissionNameModal({ permission, onConfirm }) {
+                const modalHtml = `
+                <div id="editPermissionNameModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Editar Nome do Usuário</h3>
+                        <p class="text-sm text-gray-600 mb-4">Associar um nome ao e-mail: ${permission.email}</p>
+                        <form id="formEditPermissionName">
+                            <div>
+                                <label for="permission-user-name" class="block font-semibold">Nome do Usuário</label>
+                                <input type="text" id="permission-user-name" class="w-full p-2 border rounded-lg" value="${permission.nome || ''}" required oninput="this.value = this.value.toUpperCase()">
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4 mt-4 border-t">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Salvar Nome</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => this.close());
+                DOM.qs('#formEditPermissionName').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const newName = DOM.qs('#permission-user-name').value.trim().toUpperCase();
+                    if (newName) {
+                        onConfirm(newName);
+                        this.close();
+                    }
+                });
+            },
+            showNewSystemUserModal({ onConfirm }) {
+                const modalHtml = `
+                <div id="newSystemUserModal" class="modal-overlay active">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold mb-4">Adicionar Novo Usuário do Sistema</h3>
+                        <form id="formNewSystemUser" class="space-y-4">
+                            <div><label class="block font-semibold">Email</label><input type="email" id="new-system-user-email" class="w-full p-2 border rounded-lg" required></div>
+                            <div><label class="block font-semibold">Senha (temporária)</label><input type="password" id="new-system-user-password" class="w-full p-2 border rounded-lg" required></div>
+                            <div><label class="block font-semibold">Nome</label><input type="text" id="new-system-user-name" class="w-full p-2 border rounded-lg" required oninput="this.value = this.value.toUpperCase()"></div>
+                            <div>
+                                <label class="block font-semibold">Cargo</label>
+                                <select id="new-system-user-role" class="w-full p-2 border rounded-lg">
+                                    <option value="auditor">Auditor</option>
+                                    <option value="colaborador">Colaborador</option>
+                                    <option value="administrador">Administrador</option>
+                                    <option value="desenvolvedor">Desenvolvedor</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-end gap-4 pt-4">
+                                <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Adicionar Permissão</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>`;
+                DOM.render('#modal-container', modalHtml);
+                DOM.qs('#modal-btn-cancel').addEventListener('click', () => this.close());
+                DOM.qs('#formNewSystemUser').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const userData = {
+                        email: DOM.qs('#new-system-user-email').value,
+                        password: DOM.qs('#new-system-user-password').value,
+                        nome: DOM.qs('#new-system-user-name').value.toUpperCase(),
+                        role: DOM.qs('#new-system-user-role').value,
+                    };
+                    onConfirm(userData);
+                });
+            },
+            close: () => {
+                DOM.render('#modal-container', '');
+            }
+        };
+        
+        const Views = {
+            // Auth View: Renders the login screen
+            Auth: {
+                render() {
+                    const html = `
+                    <div class="flex items-center justify-center min-h-full p-4 fade-in">
+                        <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
+                            <div class="text-center mb-8">
+                                <i class="fas fa-shield-virus text-5xl text-blue-600"></i>
+                                <h1 class="text-3xl font-bold text-gray-800 mt-4">S.G.M</h1>
+                                <p class="text-gray-500">Sistema de Gestão de Máscaras</p>
+                            </div>
+                            <form id="login-form">
+                                <div class="mb-4">
+                                    <label for="email" class="block text-gray-700 font-semibold mb-2">E-mail</label>
+                                    <input type="email" id="email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="seu.email@exemplo.com">
+                                </div>
+                                <div class="mb-6">
+                                    <label for="password" class="block text-gray-700 font-semibold mb-2">Senha</label>
+                                    <input type="password" id="password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="********">
+                                </div>
+                                <button type="submit" id="btn-login" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center">
+                                    <span id="btn-login-text">Entrar</span>
+                                    <i id="btn-login-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                                </button>
+                                <p id="login-error" class="text-red-500 text-center mt-4 text-sm"></p>
+                            </form>
+                        </div>
+                    </div>`;
+                    DOM.render('#app', html);
+                    this.addEventListeners();
+                },
+                addEventListeners() {
+                    DOM.qs('#login-form').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const email = DOM.qs('#email').value;
+                        const password = DOM.qs('#password').value;
+                        const btnText = DOM.qs('#btn-login-text');
+                        const btnSpinner = DOM.qs('#btn-login-spinner');
+                        const errorP = DOM.qs('#login-error');
+
+                        errorP.textContent = '';
+                        btnText.textContent = 'Entrando...';
+                        btnSpinner.classList.remove('hidden');
+                        DOM.qs('#btn-login').disabled = true;
+
+                        try {
+                            await AuthService.signIn(email, password);
+                            // onAuthStateChange will handle the rest
+                        } catch (error) {
+                            errorP.textContent = AuthService.getFriendlyErrorMessage(error);
+                            btnText.textContent = 'Entrar';
+                            btnSpinner.classList.add('hidden');
+                            DOM.qs('#btn-login').disabled = false;
+                        }
+                    });
+                }
+            },
+
+            // AppLayout View: Renders the main shell of the application after login
+            AppLayout: {
+                render(user) {
+                    const { isAdmin, role } = user;
+                    const isDev = role === 'desenvolvedor';
+                    const canWrite = role === 'colaborador' || isAdmin;
+
+                    const navItems = [
+                        { view: 'Dashboard', icon: 'fa-tachometer-alt', label: 'Dashboard', show: true },
+                        { view: 'Higienizacao', icon: 'fa-pump-soap', label: 'Higienização', show: canWrite },
+                        { view: 'Cadastros', icon: 'fa-user-plus', label: 'Cadastros', show: isAdmin },
+                        { view: 'Estoque', icon: 'fa-boxes-stacked', label: 'Estoque', show: true },
+                        { view: 'MascarasReserva', icon: 'fa-people-carry-box', label: 'Másc. Reserva', show: true },
+                        { view: 'GestaoUsuarios', icon: 'fa-users-cog', label: 'Usuários', show: true },
+                        { view: 'Relatorios', icon: 'fa-file-alt', label: 'Relatórios', show: true },
+                        { view: 'Pedidos', icon: 'fa-clipboard-list', label: 'Pedidos', show: isAdmin },
+                        { view: 'QuadroDeAvisos', icon: 'fa-bullhorn', label: 'Avisos', show: true },
+                        { view: 'Permissoes', icon: 'fa-user-shield', label: 'Permissões', show: isDev },
+                    ];
+
+                    const navHtml = navItems
+                        .filter(item => item.show)
+                        .map(item => `
+                        <a href="#" class="nav-tab px-3 py-4 text-sm font-semibold text-gray-500 hover:text-blue-600" data-view="${item.view}">
+                            <i class="fas ${item.icon} mr-2 hidden sm:inline-block"></i>${item.label}
+                        </a>`).join('');
+
+                    const html = `
+                    <div id="sticky-header" class="bg-gray-50/80 backdrop-blur-sm shadow-sm">
+                        <header class="container mx-auto px-4 py-3 flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-shield-virus text-2xl text-blue-600"></i>
+                                <h1 class="text-xl font-bold text-gray-800 hidden md:block">S.G.M</h1>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <button id="btn-verify-mask" title="Verificar Máscara por QR Code" class="h-10 w-10 flex items-center justify-center bg-gray-200 rounded-full hover:bg-gray-300 text-gray-600">
+                                    <i class="fas fa-qrcode"></i>
+                                </button>
+                                <div id="notification-bell">
+                                    <i class="fas fa-bell text-xl text-gray-600"></i>
+                                    <span id="notification-badge" class="hidden">0</span>
+                                    <div id="notification-panel" class="hidden"></div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-semibold text-gray-800 text-sm">${user.email}</p>
+                                    <p class="text-xs text-gray-500 capitalize">${user.role}</p>
+                                </div>
+                                <button id="logoutButton" title="Sair" class="h-10 w-10 flex items-center justify-center bg-red-100 text-red-600 rounded-full hover:bg-red-200">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                </button>
+                            </div>
+                        </header>
+                        <nav class="container mx-auto px-4 flex border-b border-gray-200 overflow-x-auto tabs">
+                            ${navHtml}
+                        </nav>
+                    </div>
+                    <main id="view-content" class="container mx-auto p-4 flex-grow fade-in"></main>
+                    `;
+                    DOM.render('#app', html);
+                }
+            },
+            
+            // Views Completas
+            Dashboard: {
+                chart: null,
+                updateInterval: null,
+                render(data, user) {
+                    const { usuarios, estoque, historico, mascarasReserva } = data;
+
+                    const totalUsers = usuarios.length;
+                    const lowStockItems = estoque.filter(i => i.qtd <= i.qtdMin).length;
+                    const availableMasks = mascarasReserva.filter(m => m.status === 'Disponível').length;
+                    
+                    const pendingUsersList = [];
+                    usuarios.forEach(u => {
+                        if (!u.createdAt || !u.createdAt.toDate) return;
+
+                        const lastSanitization = historico
+                            .filter(h => h.userId === u.userId)
+                            .sort((a, b) => b.higienizadoEm.toDate() - a.higienizadoEm.toDate())[0];
+                        
+                        const referenceDate = lastSanitization ? lastSanitization.higienizadoEm.toDate() : u.createdAt.toDate();
+                        
+                        const deadline = new Date();
+                        deadline.setMonth(deadline.getMonth() - 4);
+
+                        if (referenceDate < deadline) {
+                            pendingUsersList.push(u.nome);
+                        }
+                    });
+                    const pendingSanitizations = pendingUsersList.length;
+
+                    const complianceIndex = totalUsers > 0 ? Math.round(((totalUsers - pendingSanitizations) / totalUsers) * 100) : 100;
+                    const getComplianceClass = (index) => {
+                        if (index < 70) return 'text-red-500';
+                        if (index < 90) return 'text-yellow-500';
+                        return 'text-green-500';
+                    };
+
+                    const pendingUsersHtml = pendingUsersList.length > 0
+                        ? `<ul class="list-disc list-inside text-sm text-gray-600 mt-2">${pendingUsersList.map(name => `<li>${name}</li>`).join('')}</ul>`
+                        : '<p class="text-sm text-gray-500 mt-2">Nenhum usuário com pendências.</p>';
+
+                    const html = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-500">Índice de Conformidade</p>
+                                    <p class="text-3xl font-bold ${getComplianceClass(complianceIndex)}">${complianceIndex}%</p>
+                                </div>
+                                <i class="fas fa-check-circle text-4xl text-gray-200"></i>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-500">Status do Estoque</p>
+                                    <p class="text-3xl font-bold ${lowStockItems > 0 ? 'text-red-500' : 'text-green-500'}">${lowStockItems}</p>
+                                    <p class="text-xs text-gray-400">Itens com estoque baixo</p>
+                                </div>
+                                <i class="fas fa-boxes-stacked text-4xl text-gray-200"></i>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-500">Máscaras de Reserva</p>
+                                    <p class="text-3xl font-bold text-blue-500">${availableMasks}</p>
+                                    <p class="text-xs text-gray-400">Disponíveis para uso</p>
+                                </div>
+                                <i class="fas fa-people-carry-box text-4xl text-gray-200"></i>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-500">Higienizações Pendentes</p>
+                                    <p class="text-3xl font-bold ${pendingSanitizations > 0 ? 'text-yellow-500' : 'text-green-500'}">${pendingSanitizations}</p>
+                                     <p class="text-xs text-gray-400">Vencidas há mais de 4 meses</p>
+                                </div>
+                                <i class="fas fa-pump-soap text-4xl text-gray-200"></i>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+                            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md">
+                                <h3 class="font-bold text-lg mb-4">Higienizações nos Últimos 7 Dias</h3>
+                                <canvas id="hygieneChart"></canvas>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md">
+                                <h3 class="font-bold text-lg mb-4">Usuários com Pendências</h3>
+                                <div class="max-h-80 overflow-y-auto">
+                                    ${pendingUsersHtml}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                    this.renderChart(historico);
+                },
+                renderChart(historico) {
+                    if (this.chart) {
+                        this.chart.destroy();
+                    }
+                    const ctx = DOM.qs('#hygieneChart')?.getContext('2d');
+                    if (!ctx) return;
+
+                    const labels = [];
+                    const dataPoints = [];
+                    for (let i = 6; i >= 0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        labels.push(d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric' }));
+                        
+                        const dayStart = new Date(d);
+                        dayStart.setHours(0,0,0,0);
+                        const dayEnd = new Date(d);
+                        dayEnd.setHours(23,59,59,999);
+
+                        const count = historico.filter(h => {
+                            const hDate = h.higienizadoEm.toDate();
+                            return hDate >= dayStart && hDate <= dayEnd;
+                        }).length;
+                        dataPoints.push(count);
+                    }
+
+                    this.chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Higienizações Realizadas',
+                                data: dataPoints,
+                                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1,
+                                borderRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            }
+                        }
+                    });
+                }
+            },
+            Higienizacao: { 
+                render(data, user) {
+                    const { estoque } = data;
+                    const partsHtml = estoque.map(peca => `
+                        <div class="flex items-center justify-between p-3 bg-gray-100 rounded-lg">
+                            <label for="peca-${peca.id}" class="font-medium">${peca.nome}</label>
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-500">(Disp: ${peca.qtd})</span>
+                                <input type="number" id="peca-${peca.id}" data-id="${peca.id}" data-nome="${peca.nome}" class="w-20 p-1 border rounded text-center" min="0" max="${peca.qtd}" placeholder="0">
+                            </div>
+                        </div>
+                    `).join('');
+
+                    const html = `
+                        <div class="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
+                            <h2 class="text-2xl font-bold mb-6 text-gray-800">Registrar Higienização</h2>
+                            <form id="formHigienizacao" class="space-y-6">
+                                <div class="relative">
+                                    <label for="search-hig-usuario" class="block font-semibold mb-1">Usuário</label>
+                                    <div class="flex">
+                                        <input type="text" id="search-hig-usuario" class="w-full p-3 border-gray-300 border rounded-l-lg focus:ring-2 focus:ring-blue-500" placeholder="Digite para buscar ou escaneie o QR Code" autocomplete="off">
+                                        <button type="button" id="btn-scan-user" class="bg-gray-200 px-4 rounded-r-lg hover:bg-gray-300"><i class="fas fa-qrcode"></i></button>
+                                    </div>
+                                    <div id="autocomplete-results" class="absolute z-10 w-full bg-white border rounded-lg mt-1 shadow-lg hidden"></div>
+                                    <input type="hidden" id="selected-user-id">
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="hig-tamanho" class="block font-semibold mb-1">Tamanho da Máscara</label>
+                                        <input type="text" id="hig-tamanho" class="w-full p-3 bg-gray-100 border rounded-lg" readonly>
+                                    </div>
+                                    <div>
+                                        <label for="hig-responsavel" class="block font-semibold mb-1">Responsável</label>
+                                        <input type="text" id="hig-responsavel" class="w-full p-3 bg-gray-100 border rounded-lg" value="${user.email}" readonly>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold mb-2">Peças Trocadas</h3>
+                                    <div class="space-y-3 max-h-60 overflow-y-auto p-2 border rounded-lg">${partsHtml}</div>
+                                </div>
+                                <div>
+                                    <label for="hig-report" class="block font-semibold mb-1">Relatório de Danos/Observações</label>
+                                    <textarea id="hig-report" class="w-full p-3 border-gray-300 border rounded-lg" rows="3" placeholder="Descreva qualquer dano encontrado..."></textarea>
+                                </div>
+                                <div class="text-right">
+                                    <button type="submit" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors">Registrar</button>
+                                </div>
+                            </form>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                    this.addEventListeners(data.usuarios);
+                },
+                addEventListeners(usuarios) {
+                    const searchInput = DOM.qs('#search-hig-usuario');
+                    const resultsContainer = DOM.qs('#autocomplete-results');
+                    const selectedUserIdInput = DOM.qs('#selected-user-id');
+                    const tamanhoInput = DOM.qs('#hig-tamanho');
+
+                    searchInput.addEventListener('input', () => {
+                        const term = searchInput.value.toLowerCase();
+                        if (term.length < 2) {
+                            resultsContainer.innerHTML = '';
+                            resultsContainer.classList.add('hidden');
+                            return;
+                        }
+                        const filtered = usuarios.filter(u => u.nome.toLowerCase().includes(term));
+                        resultsContainer.innerHTML = filtered.map(u => `<div class="p-3 hover:bg-gray-100 cursor-pointer" data-id="${u.userId}" data-nome="${u.nome}" data-tamanho="${u.tamanhoMascara}">${u.nome}</div>`).join('');
+                        resultsContainer.classList.remove('hidden');
+                    });
+
+                    resultsContainer.addEventListener('click', (e) => {
+                        if (e.target.matches('[data-id]')) {
+                            searchInput.value = e.target.dataset.nome;
+                            selectedUserIdInput.value = e.target.dataset.id;
+                            tamanhoInput.value = e.target.dataset.tamanho;
+                            resultsContainer.classList.add('hidden');
+                        }
+                    });
+
+                    DOM.qs('#formHigienizacao').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const userId = selectedUserIdInput.value;
+                        if (!userId) {
+                            DOM.showToast('Por favor, selecione um usuário.', 'error');
+                            return;
+                        }
+                        
+                        const pecasTrocadas = [...DOM.qsa('#formHigienizacao input[type="number"]')]
+                            .filter(input => parseInt(input.value, 10) > 0)
+                            .map(input => ({
+                                id: input.dataset.id,
+                                nome: input.dataset.nome,
+                                qtd: parseInt(input.value, 10)
+                            }));
+                        
+                        const allStock = App.state.data.estoque;
+                        const partsToUpdate = pecasTrocadas.map(p => {
+                            const stockItem = allStock.find(s => s.id === p.id);
+                            return { id: p.id, newQty: stockItem.qtd - p.qtd };
+                        });
+
+                        const registro = {
+                            userId: userId,
+                            userName: searchInput.value,
+                            tamanhoMascara: tamanhoInput.value,
+                            pecasTrocadas: pecasTrocadas,
+                            responsavel: DOM.qs('#hig-responsavel').value,
+                            higienizadoEm: Timestamp.now(),
+                            report: DOM.qs('#hig-report').value
+                        };
+                        
+                        try {
+                            await DataService.saveRecordAndUpdateStock(registro, partsToUpdate);
+                            DOM.showToast('Higienização registrada com sucesso!');
+                            e.target.reset();
+                        } catch (error) {
+                            console.error("Erro ao salvar registro:", error);
+                            DOM.showToast('Erro ao salvar o registro.', 'error');
+                        }
+                    });
+                }
+            },
+            Cadastros: { 
+                render(data, user) {
+                    const setores = ['Ectos', 'Endos', 'EAR Tag', 'Outros'];
+                    const setoresHtml = setores.map(setor => `
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" name="setores" value="${setor}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span>${setor}</span>
+                        </label>
+                    `).join('');
+
+                    const html = `
+                        <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
+                            <h2 class="text-2xl font-bold mb-6">Cadastrar Novo Usuário</h2>
+                            <form id="form-add-user" class="space-y-4">
+                                <div><label class="block font-semibold mb-1">Nome Completo</label><input type="text" id="new-user-name" class="w-full p-2 border rounded-lg" required oninput="this.value = this.value.toUpperCase()"></div>
+                                <div><label class="block font-semibold mb-1">Tamanho da Máscara</label>
+                                    <select id="new-user-mask-size" class="w-full p-2 border rounded-lg"><option>P</option><option>M</option><option>G</option></select>
+                                </div>
+                                <div><label class="block font-semibold mb-2">Setores</label><div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${setoresHtml}</div></div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label class="block font-semibold mb-1">Data De Vencimento do Teste De Vedação</label><input type="date" id="new-user-test-date" class="w-full p-2 border rounded-lg" required></div>
+                                    <div><label class="block font-semibold mb-1">Vencimento da Máscara</label><input type="date" id="new-user-mask-expiry" class="w-full p-2 border rounded-lg" required></div>
+                                </div>
+                                <div class="text-right pt-4"><button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">Cadastrar</button></div>
+                            </form>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                    this.addEventListeners();
+                },
+                addEventListeners() {
+                    DOM.qs('#form-add-user').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        const userData = {
+                            userId: `user_${crypto.randomUUID()}`,
+                            nome: DOM.qs('#new-user-name').value.toUpperCase(),
+                            tamanhoMascara: DOM.qs('#new-user-mask-size').value,
+                            setores: [...DOM.qsa('input[name="setores"]:checked')].map(el => el.value),
+                            dataTeste: Timestamp.fromDate(new Date(DOM.qs('#new-user-test-date').value)),
+                            vencimentoMascara: Timestamp.fromDate(new Date(DOM.qs('#new-user-mask-expiry').value)),
+                            createdAt: serverTimestamp()
+                        };
+                        
+                        try {
+                            await DataService.addDocument('usuarios', userData);
+                            DOM.showToast('Usuário cadastrado com sucesso!');
+                            e.target.reset();
+                        } catch (error) {
+                            DOM.showToast('Erro ao cadastrar usuário.', 'error');
+                            console.error(error);
+                        }
+                    });
+                }
+            },
+            Estoque: { 
+                render(data, user, params = {}) {
+                    const { isAdmin } = user;
+                    let { estoque } = data;
+                    if (params.searchTerm) {
+                        const term = params.searchTerm.toLowerCase();
+                        estoque = estoque.filter(p => p.nome.toLowerCase().includes(term) || p.codigo.toLowerCase().includes(term));
+                    }
+                    
+                    const getStatusClass = (peca) => {
+                        if (peca.qtd <= 0) return 'bg-red-100 text-red-700';
+                        if (peca.qtd <= peca.qtdMin) return 'bg-yellow-100 text-yellow-700';
+                        return 'bg-green-100 text-green-700';
+                    };
+
+                    const tableRows = estoque.map(peca => `
+                        <tr class="border-b">
+                            <td data-label="Peça" class="p-3 font-medium">${peca.nome}</td>
+                            <td data-label="Código" class="p-3 text-gray-500">${peca.codigo}</td>
+                            <td data-label="Qtd. Atual" class="p-3 font-bold">${peca.qtd}</td>
+                            <td data-label="Qtd. Mínima" class="p-3 text-gray-500">${peca.qtdMin}</td>
+                            <td data-label="Status" class="p-3"><span class="px-2 py-1 text-xs font-bold rounded-full ${getStatusClass(peca)}">${peca.qtd <= peca.qtdMin ? 'BAIXO' : 'OK'}</span></td>
+                            <td data-label="Ações" class="p-3 text-right">
+                                ${isAdmin ? `
+                                <button title="Adicionar quantidade" class="btn-add-stock text-green-500 hover:text-green-700 p-2" data-id="${peca.id}"><i class="fas fa-plus-circle"></i></button>
+                                <button title="Editar item" class="btn-edit-stock text-blue-500 hover:text-blue-700 p-2" data-id="${peca.id}"><i class="fas fa-edit"></i></button>
+                                <button title="Excluir item" class="btn-delete-stock text-red-500 hover:text-red-700 p-2" data-id="${peca.id}"><i class="fas fa-trash"></i></button>
+                                ` : '<span class="text-xs text-gray-400">N/A</span>'}
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    const html = `
+                        <div class="bg-white p-6 rounded-2xl shadow-lg">
+                            <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                                <h2 class="text-2xl font-bold">Controle de Estoque</h2>
+                                <div class="flex gap-2 w-full md:w-auto">
+                                    <form id="search-form-estoque" class="flex-grow"><input type="search" id="search-input-estoque" placeholder="Buscar peça..." class="w-full p-2 border rounded-lg"></form>
+                                    ${isAdmin ? '<button id="btn-add-peca" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 whitespace-nowrap"><i class="fas fa-plus mr-2"></i>Nova Peça</button>' : ''}
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full responsive-table">
+                                    <thead class="bg-gray-50"><tr>
+                                        <th class="p-3 text-left font-semibold">Peça</th><th class="p-3 text-left font-semibold">Código</th><th class="p-3 text-left font-semibold">Qtd. Atual</th><th class="p-3 text-left font-semibold">Qtd. Mínima</th><th class="p-3 text-left font-semibold">Status</th><th class="p-3 text-right font-semibold">Ações</th>
+                                    </tr></thead>
+                                    <tbody>${tableRows || '<tr><td colspan="6" class="text-center p-4">Nenhuma peça encontrada.</td></tr>'}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                },
+                showNewPieceModal(onConfirm) {
+                    const modalHtml = `
+                    <div id="newPieceModal" class="modal-overlay active">
+                        <div class="modal-content p-6">
+                            <h3 class="text-xl font-bold mb-4">Adicionar Nova Peça</h3>
+                            <form id="formNewPiece" class="space-y-4">
+                                <div><label class="block font-semibold">Nome</label><input type="text" id="new-piece-name" class="w-full p-2 border rounded-lg" required></div>
+                                <div><label class="block font-semibold">Código</label><input type="text" id="new-piece-code" class="w-full p-2 border rounded-lg" required></div>
+                                <div><label class="block font-semibold">Qtd. Inicial</label><input type="number" id="new-piece-qty" class="w-full p-2 border rounded-lg" required min="0"></div>
+                                <div><label class="block font-semibold">Qtd. Mínima</label><input type="number" id="new-piece-min-qty" class="w-full p-2 border rounded-lg" required min="0"></div>
+                                <div class="flex justify-end gap-4 pt-4">
+                                    <button type="button" id="modal-btn-cancel" class="px-6 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+                                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg">Adicionar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>`;
+                    DOM.render('#modal-container', modalHtml);
+                    DOM.qs('#modal-btn-cancel').addEventListener('click', () => ModalService.close());
+                    DOM.qs('#formNewPiece').addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const pieceData = {
+                            nome: DOM.qs('#new-piece-name').value,
+                            codigo: DOM.qs('#new-piece-code').value,
+                            qtd: parseInt(DOM.qs('#new-piece-qty').value, 10),
+                            qtdMin: parseInt(DOM.qs('#new-piece-min-qty').value, 10)
+                        };
+                        onConfirm(pieceData);
+                        ModalService.close();
+                    });
+                }
+            },
+            MascarasReserva: { 
+                render(data, user) {
+                    const { isAdmin } = user;
+                    const { mascarasReserva } = data;
+                    const getStatusClass = (status) => status === 'Disponível' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700';
+
+                    const tableRows = mascarasReserva.map(m => `
+                        <tr class="border-b">
+                            <td data-label="ID" class="p-3 font-medium">${m.identificacao}</td>
+                            <td data-label="Tamanho" class="p-3">${m.tamanho}</td>
+                            <td data-label="Status" class="p-3"><span class="px-2 py-1 text-xs font-bold rounded-full ${getStatusClass(m.status)}">${m.status}</span></td>
+                            <td data-label="Usuário Atual" class="p-3 text-gray-600">${m.currentUser || 'N/A'}</td>
+                            <td data-label="Ações" class="p-3 text-right space-x-1">
+                                <button title="Gerar QR Code" class="btn-show-mask-qr text-gray-500 p-2" data-id="${m.id}" data-identificacao="${m.identificacao}"><i class="fas fa-qrcode"></i></button>
+                                <button title="Ver Observações" class="btn-show-observations text-gray-500 p-2" data-id="${m.id}"><i class="fas fa-comment-dots"></i></button>
+                                ${isAdmin ? `
+                                    ${m.status === 'Disponível' ? 
+                                        `<button title="Emprestar" class="btn-loan-mask text-blue-500 p-2" data-id="${m.id}"><i class="fas fa-hand-holding-hand"></i></button>` : 
+                                        `<button title="Devolver" class="btn-return-mask text-green-500 p-2" data-id="${m.id}"><i class="fas fa-undo"></i></button>`
+                                    }
+                                    <button title="Excluir" class="btn-delete-mask text-red-500 p-2" data-id="${m.id}"><i class="fas fa-trash"></i></button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    const html = `
+                        <div class="bg-white p-6 rounded-2xl shadow-lg">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold">Máscaras de Reserva</h2>
+                                ${isAdmin ? '<button id="btn-new-reserve-mask" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-plus mr-2"></i>Nova Máscara</button>' : ''}
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full responsive-table">
+                                    <thead class="bg-gray-50"><tr>
+                                        <th class="p-3 text-left">Identificação</th><th class="p-3 text-left">Tamanho</th><th class="p-3 text-left">Status</th><th class="p-3 text-left">Usuário Atual</th><th class="p-3 text-right">Ações</th>
+                                    </tr></thead>
+                                    <tbody>${tableRows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                    this.addEventListeners();
+                },
+                addEventListeners() {
+                    const btnNewMask = DOM.qs('#btn-new-reserve-mask');
+                    if (btnNewMask) {
+                        btnNewMask.addEventListener('click', () => {
+                            ModalService.showNewReserveMaskModal({
+                                onConfirm: async (maskData) => {
+                                    await DataService.addDocument('mascarasReserva', {
+                                        ...maskData,
+                                        status: 'Disponível',
+                                        currentUser: '',
+                                        currentUserId: '',
+                                        observacoes: [],
+                                        createdAt: serverTimestamp()
+                                    });
+                                    DOM.showToast('Máscara de reserva adicionada!');
+                                }
+                            });
+                        });
+                    }
+                }
+            },
+            GestaoUsuarios: { 
+                currentPage: 1,
+                itemsPerPage: 10,
+                render(data, user, params = {}) {
+                    let { usuarios } = data;
+
+                    // 1. Filtrar
+                    if (params.searchTerm) {
+                        const term = params.searchTerm.toLowerCase();
+                        usuarios = usuarios.filter(u => u.nome.toLowerCase().includes(term));
+                    }
+
+                    // 2. Ordenar
+                    usuarios.sort((a, b) => a.nome.localeCompare(b.nome));
+
+                    // 3. Paginar
+                    const totalPages = Math.ceil(usuarios.length / this.itemsPerPage);
+                    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+                    const endIndex = startIndex + this.itemsPerPage;
+                    const paginatedUsers = usuarios.slice(startIndex, endIndex);
+
+                    const tableRows = paginatedUsers.map(u => {
+                        const status = getUserStatus(u);
+                        return `
+                        <tr class="border-b">
+                            <td data-label="Nome" class="p-3 font-medium">${u.nome}</td>
+                            <td data-label="Setores" class="p-3 text-gray-500">${(u.setores || []).join(', ')}</td>
+                            <td data-label="Teste" class="p-3"><span class="px-2 py-1 text-xs font-bold rounded-full ${status.test.class}">${status.test.text}</span></td>
+                            <td data-label="Máscara" class="p-3"><span class="px-2 py-1 text-xs font-bold rounded-full ${status.mask.class}">${status.mask.text}</span></td>
+                            <td data-label="Ações" class="p-3 text-right space-x-1">
+                                <button title="Ver Histórico" class="btn-show-history text-purple-500 p-2" data-userid="${u.userId}" data-nome="${u.nome}"><i class="fas fa-history"></i></button>
+                                <button title="Gerar QR Code" class="btn-show-user-qr text-gray-500 p-2" data-userid="${u.userId}" data-nome="${u.nome}"><i class="fas fa-qrcode"></i></button>
+                                ${user.isAdmin ? `
+                                <button title="Editar Usuário" class="btn-edit-user text-blue-500 p-2" data-userid="${u.userId}"><i class="fas fa-edit"></i></button>
+                                <button title="Excluir Usuário" class="btn-delete-user text-red-500 p-2" data-userid="${u.userId}"><i class="fas fa-trash"></i></button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                        `;
+                    }).join('');
+
+                    const paginationHtml = `
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="text-sm text-gray-600">Página ${this.currentPage} de ${totalPages}</span>
+                            <div class="flex gap-2">
+                                <button id="btn-prev-page" class="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300" ${this.currentPage === 1 ? 'disabled' : ''}>Anterior</button>
+                                <button id="btn-next-page" class="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300" ${this.currentPage === totalPages ? 'disabled' : ''}>Próximo</button>
+                            </div>
+                        </div>
+                    `;
+
+                    const html = `
+                        <div class="bg-white p-6 rounded-2xl shadow-lg">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold">Gestão de Usuários</h2>
+                                <form id="search-form-users"><input type="search" id="search-input-users" value="${params.searchTerm || ''}" placeholder="Buscar usuário..." class="p-2 border rounded-lg"></form>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full responsive-table">
+                                    <thead class="bg-gray-50"><tr>
+                                        <th class="p-3 text-left">Nome</th><th class="p-3 text-left">Setores</th><th class="p-3 text-left">Status Teste</th><th class="p-3 text-left">Status Máscara</th><th class="p-3 text-right">Ações</th>
+                                    </tr></thead>
+                                    <tbody>${tableRows || `<tr><td colspan="5" class="text-center p-4">Nenhum usuário encontrado.</td></tr>`}</tbody>
+                                </table>
+                            </div>
+                            ${totalPages > 1 ? paginationHtml : ''}
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                    this.addEventListeners();
+                },
+                addEventListeners() {
+                    const prevBtn = DOM.qs('#btn-prev-page');
+                    const nextBtn = DOM.qs('#btn-next-page');
+
+                    if (prevBtn) {
+                        prevBtn.addEventListener('click', () => {
+                            if (this.currentPage > 1) {
+                                this.currentPage--;
+                                App.renderCurrentView({ searchTerm: DOM.qs('#search-input-users').value });
+                            }
+                        });
+                    }
+                    if (nextBtn) {
+                        const totalUsers = App.state.data.usuarios.length;
+                        const totalPages = Math.ceil(totalUsers / this.itemsPerPage);
+                        if (this.currentPage < totalPages) {
+                            nextBtn.addEventListener('click', () => {
+                                this.currentPage++;
+                                App.renderCurrentView({ searchTerm: DOM.qs('#search-input-users').value });
+                            });
+                        }
+                    }
+                }
+            },
+            Relatorios: { 
+                render(data, user) {
+                    const userOptions = data.usuarios.map(u => `<option>${u.nome}</option>`).join('');
+                    const setores = [...new Set(data.usuarios.flatMap(u => u.setores || []))];
+                    const setorOptions = setores.map(s => `<option>${s}</option>`).join('');
+
+                    const html = `
+                        <div class="space-y-8">
+                            <!-- Relatório de Higienização -->
+                            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                                <h3 class="text-xl font-bold mb-4">Relatório de Higienizações</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                    <input type="date" id="hig-start-date" class="p-2 border rounded-lg">
+                                    <input type="date" id="hig-end-date" class="p-2 border rounded-lg">
+                                    <select id="hig-setor" class="p-2 border rounded-lg"><option>Todos</option>${setorOptions}</select>
+                                    <select id="hig-usuario" class="p-2 border rounded-lg"><option>Todos</option>${userOptions}</select>
+                                    <select id="hig-status" class="p-2 border rounded-lg"><option>Todos</option><option>Com Danos</option><option>Sem Danos</option></select>
+                                </div>
+                                <div class="flex gap-2 mb-4">
+                                    <button class="preset-date-btn text-xs bg-gray-200 px-3 py-1 rounded-full" data-preset="today">Hoje</button>
+                                    <button class="preset-date-btn text-xs bg-gray-200 px-3 py-1 rounded-full" data-preset="week">Esta Semana</button>
+                                    <button class="preset-date-btn text-xs bg-gray-200 px-3 py-1 rounded-full" data-preset="month">Este Mês</button>
+                                </div>
+                                <div class="flex justify-end gap-4">
+                                    <button class="btn-generate-hig-report bg-red-600 text-white font-bold py-2 px-4 rounded-lg" data-format="pdf"><i class="fas fa-file-pdf mr-2"></i>Gerar PDF</button>
+                                    <button class="btn-generate-hig-report bg-green-600 text-white font-bold py-2 px-4 rounded-lg" data-format="excel"><i class="fas fa-file-excel mr-2"></i>Gerar Excel</button>
+                                </div>
+                            </div>
+
+                            <!-- Outros Relatórios -->
+                            <div class="grid md:grid-cols-2 gap-8">
+                                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                                    <h3 class="text-xl font-bold mb-4">Relatório de Estoque</h3>
+                                    <div class="flex justify-end gap-4">
+                                        <button id="btn-generate-stock-pdf" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+                                        <button id="btn-generate-stock-excel" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-file-excel mr-2"></i>Excel</button>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                                    <h3 class="text-xl font-bold mb-4">Relatório de Usuários</h3>
+                                    <div class="flex justify-end gap-4">
+                                        <button id="btn-generate-user-pdf" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
+                                        <button id="btn-generate-user-excel" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-file-excel mr-2"></i>Excel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                }
+            },
+            Pedidos: { 
+                render(data, user) {
+                    const { estoque } = data;
+                    const lowStockItems = estoque.filter(item => item.qtd <= item.qtdMin);
+                    const suggestedItemsHtml = lowStockItems.map(item => `
+                        <div class="flex justify-between items-center p-2 border-b">
+                            <span>${item.nome} (${item.codigo})</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-red-500">Atual: ${item.qtd}</span>
+                                <input type="number" class="w-20 p-1 border rounded text-center" value="${item.qtdMin - item.qtd + 5}" min="1" data-id="${item.id}">
+                            </div>
+                        </div>
+                    `).join('');
+
+                    const html = `
+                        <div class="grid md:grid-cols-2 gap-8">
+                            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                                <h3 class="text-xl font-bold mb-4">Sugestão de Compra de Peças</h3>
+                                <div class="space-y-2 mb-4 max-h-60 overflow-y-auto" id="low-stock-list">
+                                    ${suggestedItemsHtml || '<p class="text-gray-500">Nenhum item com estoque baixo.</p>'}
+                                </div>
+                                <div class="flex justify-end gap-4 mt-4">
+                                    <button id="btn-manual-parts" class="bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Pedido Manual</button>
+                                    <button id="btn-generate-parts-order" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg ${!lowStockItems.length ? 'hidden' : ''}">Gerar Pedido</button>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                                <h3 class="text-xl font-bold mb-4">Pedido de Novas Máscaras</h3>
+                                <p class="text-gray-600 mb-4">Crie um pedido de compra manual para novas máscaras de proteção.</p>
+                                <div class="flex justify-end gap-4 mt-4">
+                                    <button id="btn-manual-masks" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg">Criar Pedido de Máscaras</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                }
+            },
+            QuadroDeAvisos: { 
+                render(data, user) {
+                    const { noticeBoard, permissao } = data;
+                    const { uid, isAdmin } = user;
+                    const uidToName = new Map(permissao.map(p => [p.id, p.nome]));
+
+                    const getStatusInfo = (status) => {
+                        const map = {
+                            'Não Resolvido': { icon: 'fa-exclamation-circle', color: 'text-red-500', bg: 'bg-red-50' },
+                            'Em Andamento': { icon: 'fa-spinner fa-spin', color: 'text-blue-500', bg: 'bg-blue-50' },
+                            'Resolvido': { icon: 'fa-check-circle', color: 'text-green-500', bg: 'bg-green-50' },
+                        };
+                        return map[status] || map['Não Resolvido'];
+                    };
+
+                    const noticesHtml = noticeBoard
+                        .filter(n => n.isPublic || n.recipients.includes(uid) || isAdmin)
+                        .sort((a,b) => b.createdAt.seconds - a.createdAt.seconds)
+                        .map(n => {
+                            const statusInfo = getStatusInfo(n.status);
+                            return `
+                            <div class="bg-white p-4 rounded-lg shadow-md">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-bold">${n.title}</h4>
+                                        <p class="text-xs text-gray-500">Por ${n.createdBy} em ${n.createdAt.toDate().toLocaleDateString('pt-BR')}</p>
+                                    </div>
+                                    <span class="text-xs font-bold py-1 px-2 rounded-full ${statusInfo.bg} ${statusInfo.color}"><i class="fas ${statusInfo.icon} mr-1"></i>${n.status}</span>
+                                </div>
+                                <p class="text-sm my-3">${n.description}</p>
+                                ${n.resolution ? `<div class="bg-gray-50 p-2 mt-2 rounded-md text-sm"><p class="font-semibold">Resolução:</p><p>${n.resolution}</p></div>` : ''}
+                                <div class="text-right mt-2 space-x-2">
+                                    <button class="btn-update-notice text-sm text-blue-600" data-id="${n.id}">Atualizar</button>
+                                    ${isAdmin ? `<button class="btn-edit-notice text-sm text-gray-600" data-id="${n.id}">Editar</button><button class="btn-delete-notice text-sm text-red-600" data-id="${n.id}">Excluir</button>` : ''}
+                                </div>
+                            </div>
+                            `
+                        }).join('');
+                    
+                    const html = `
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-2xl font-bold">Quadro de Avisos</h2>
+                            ${isAdmin ? '<button id="btn-new-notice" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-plus mr-2"></i>Novo Aviso</button>' : ''}
+                        </div>
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${noticesHtml || '<p>Nenhum aviso para exibir.</p>'}
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                }
+            },
+            Permissoes: { 
+                render(data, user) {
+                    const { permissao, userStatus } = data;
+                    const statusMap = new Map(userStatus.map(s => [s.uid, s]));
+                    
+                    const rows = permissao.map(p => {
+                        const status = statusMap.get(p.id) || {};
+                        return `
+                        <tr class="border-b">
+                            <td data-label="Email" class="p-3">${status.email || 'N/A'}</td>
+                            <td data-label="Nome" class="p-3 font-medium">
+                                ${p.nome || '<span class="text-gray-400">Não definido</span>'}
+                                <button class="btn-edit-permission-name text-blue-500 ml-2" data-id="${p.id}"><i class="fas fa-pen text-xs"></i></button>
+                            </td>
+                            <td data-label="Cargo" class="p-3">
+                                <select class="role-select p-2 border rounded-lg w-full" data-uid="${p.id}" ${user.uid === p.id && user.role !== 'desenvolvedor' ? 'disabled' : ''}>
+                                    <option value="auditor" ${p.role === 'auditor' ? 'selected' : ''}>Auditor</option>
+                                    <option value="colaborador" ${p.role === 'colaborador' ? 'selected' : ''}>Colaborador</option>
+                                    <option value="administrador" ${p.role === 'administrador' ? 'selected' : ''}>Administrador</option>
+                                    <option value="desenvolvedor" ${p.role === 'desenvolvedor' ? 'selected' : ''}>Desenvolvedor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        `;
+                    }).join('');
+
+                    const html = `
+                        <div class="bg-white p-6 rounded-2xl shadow-lg">
+                             <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold">Gestão de Permissões</h2>
+                                ${user.role === 'desenvolvedor' ? '<button id="btn-new-system-user" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg"><i class="fas fa-user-plus mr-2"></i>Adicionar Usuário ao Sistema</button>' : ''}
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full responsive-table">
+                                    <thead class="bg-gray-50"><tr>
+                                        <th class="p-3 text-left">Email</th><th class="p-3 text-left">Nome</th><th class="p-3 text-left">Cargo</th>
+                                    </tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    DOM.render('#view-content', html);
+                }
+            },
+        };
+        
+        // =================================================================================
+        // MÓDULO PRINCIPAL DA APLICAÇÃO (App)
+        // =================================================================================
+        const App = {
+            state: {
+                user: null,
+                currentView: 'Dashboard',
+                data: {
+                    usuarios: [], estoque: [], historico: [], mascarasReserva: [],
+                    noticeBoard: [], permissao: [], userStatus: []
+                },
+                listeners: [],
+                isDataLoaded: false
+            },
+
+            init() {
+                DOM.render('#app', '<div class="flex items-center justify-center h-screen"><i class="fas fa-spinner fa-spin text-blue-500 text-4xl"></i></div>');
+                DOM.qs('#footer-text').textContent = `S.G.M © ${new Date().getFullYear()}`;
+                DOM.toggleFabs(false);
+                OfflineService.init();
+                this.addEventListeners();
+                this.handleConnectionChange();
+                AuthService.listenToAuthChanges(this.onAuthStateChange.bind(this));
+            },
+
+            async onAuthStateChange(user) {
+                if (this.state.user && !user) { 
+                    this.state.listeners.forEach(unsubscribe => unsubscribe());
+                    this.state.listeners = [];
+                    if(Views.Dashboard && Views.Dashboard.stopAutoUpdate) Views.Dashboard.stopAutoUpdate();
+                    PresenceService.stop();
+                }
+                
+                this.state.user = user;
+                
+                if (user) {
+                    Views.AppLayout.render(user);
+                    this.attachMainAppEventListeners();
+                    await this.loadInitialData();
+                    PresenceService.init();
+                    NotificationService.requestPermission();
+                    DOM.toggleFabs(true);
+                } else {
+                    Views.Auth.render();
+                    DOM.toggleFabs(false);
+                }
+            },
+
+            async loadInitialData() {
+                await this.loadDataFromCache();
+                this.setupFirebaseListeners();
+            },
+
+            async loadDataFromCache() {
+                const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'permissao'];
+                for (const name of collections) {
+                    this.state.data[name] = await OfflineService.getCollection(name);
+                }
+                this.state.isDataLoaded = true;
+                this.renderCurrentView();
+            },
+            
+            setupFirebaseListeners() {
+                const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'permissao', 'userStatus'];
+                collections.forEach(name => {
+                    const unsubscribe = DataService.listenToCollection(name, (data) => {
+                        this.state.data[name] = data;
+                        if(this.state.isDataLoaded) {
+                            this.updateNotifications();
+                            if(!(name === 'userStatus' && this.state.currentView === 'Cadastros')) {
+                                this.renderCurrentView();
+                            }
+                        }
+                    });
+                    this.state.listeners.push(unsubscribe);
+                });
+            },
+
+            renderCurrentView(params = {}) {
+                const viewName = this.state.currentView;
+                const view = Views[viewName]; 
+                if (view && typeof view.render === 'function') {
+                    DOM.qsa('.nav-tab').forEach(tab => tab.classList.remove('active'));
+                    const activeTab = DOM.qs(`.nav-tab[data-view="${viewName}"]`);
+                    if (activeTab) activeTab.classList.add('active');
+                    
+                    view.render(this.state.data, this.state.user, params);
+                } else {
+                    console.error(`View ${viewName} não encontrada ou não tem método render.`);
+                    DOM.render('#view-content', `<div class="p-6 bg-red-100 text-red-700 rounded-lg">
+                        <h2 class="font-bold">Erro de Carregamento</h2>
+                        <p>A visualização solicitada ('${viewName}') não foi encontrada ou não pôde ser renderizada. Por favor, contate o suporte.</p>
+                    </div>`);
+                }
+            },
+
+            onNavigate(viewName, params = {}) {
+                if (Views.Dashboard && typeof Views.Dashboard.stopAutoUpdate === 'function') {
+                    Views.Dashboard.stopAutoUpdate();
+                }
+                // Reset page to 1 when navigating to user management
+                if (viewName === 'GestaoUsuarios') {
+                    Views.GestaoUsuarios.currentPage = 1;
+                }
+                this.state.currentView = viewName;
+                this.renderCurrentView(params);
+            },
+            
+            addEventListeners() {
+                window.addEventListener('online', this.handleConnectionChange.bind(this));
+                window.addEventListener('offline', this.handleConnectionChange.bind(this));
+                document.body.addEventListener('click', this.handleGlobalClick.bind(this));
+                document.body.addEventListener('change', this.handleGlobalChange.bind(this));
+                document.body.addEventListener('submit', this.handleGlobalSubmit.bind(this));
+            },
+            
+            handleGlobalChange(e) {
+                if (e.target.matches('.role-select')) {
+                    const select = e.target;
+                    const uid = select.dataset.uid;
+                    const newRole = select.value;
+                    const originalPermission = this.state.data.permissao.find(p => p.id === uid);
+                    const originalRole = originalPermission.role;
+
+                    const currentUser = this.state.user;
+
+                    // Regras de permissão
+                    if (currentUser.role === 'desenvolvedor' && currentUser.uid !== uid) {
+                        DOM.showToast('Desenvolvedores só podem alterar o próprio cargo.', 'error');
+                        select.value = originalRole;
+                        return;
+                    }
+
+                    if (currentUser.role === 'administrador') {
+                        if (newRole === 'desenvolvedor') {
+                            DOM.showToast('Administradores não podem designar desenvolvedores.', 'error');
+                            select.value = originalRole;
+                            return;
+                        }
+                        if (originalRole === 'desenvolvedor') {
+                            DOM.showToast('Administradores não podem alterar o cargo de desenvolvedores.', 'error');
+                            select.value = originalRole;
+                            return;
+                        }
+                    }
+
+                    select.disabled = true;
+
+                    ModalService.showConfirmation({
+                        title: 'Confirmar Alteração de Cargo',
+                        message: `Deseja realmente alterar o cargo deste usuário para ${newRole}?`,
+                        onConfirm: async () => {
+                            try {
+                                await DataService.updateDocument('permissao', uid, { role: newRole }, 'permissao');
+                                DOM.showToast('Cargo atualizado com sucesso!', 'success');
+                            } catch (error) {
+                                console.error("Erro ao atualizar cargo:", error);
+                                DOM.showToast('Falha ao atualizar o cargo.', 'error');
+                                select.value = originalRole;
+                            } finally {
+                                select.disabled = false;
+                            }
+                        },
+                    });
+                     
+                    const modal = DOM.qs('#confirmationModal');
+                    if (modal) {
+                        modal.addEventListener('click', (ev) => {
+                            if (ev.target.id === 'modal-btn-cancel' || !modal.contains(ev.target)) {
+                                select.value = originalRole;
+                                select.disabled = false;
+                            }
+                        });
+                    }
+                }
+            },
+
+            handleGlobalSubmit(e) {
+                e.preventDefault();
+                if (e.target.id === 'search-form-estoque') {
+                    const searchTerm = DOM.qs('#search-input-estoque').value;
+                    this.onNavigate('Estoque', { searchTerm });
+                }
+                if (e.target.id === 'search-form-users') {
+                    Views.GestaoUsuarios.currentPage = 1; // Reset page on new search
+                    const searchTerm = DOM.qs('#search-input-users').value;
+                    this.onNavigate('GestaoUsuarios', { searchTerm });
+                }
+            },
+
+            attachMainAppEventListeners() {
+                const appContainer = DOM.qs('#app');
+                if (!appContainer) return;
+
+                appContainer.addEventListener('click', (e) => {
+                    const target = e.target;
+                    
+                    if (target.closest('#logoutButton')) AuthService.signOut();
+                    
+                    const navTab = target.closest('.nav-tab');
+                    if (navTab) this.onNavigate(navTab.dataset.view);
+
+                    const btnVerifyMask = target.closest('#btn-verify-mask');
+                    if (btnVerifyMask) {
+                        ModalService.showMaskVerificationScanner({
+                            getLocalData: async () => ({
+                                mascaras: await OfflineService.getCollection('mascarasReserva'),
+                                usuarios: await OfflineService.getCollection('usuarios'),
+                                historico: await OfflineService.getCollection('historico')
+                            })
+                        });
+                    }
+
+                    const notificationBell = target.closest('#notification-bell');
+                    if (notificationBell) {
+                        const panel = DOM.qs('#notification-panel');
+                        if (panel) panel.classList.toggle('hidden');
+                    }
+                });
+
+                DOM.qs('#assistant-fab').addEventListener('click', () => {
+                    ModalService.showAssistant(AssistantService.processCommand.bind(AssistantService));
+                });
+                
+                DOM.qs('#btn-feedback').addEventListener('click', () => {
+                     ModalService.showFeedbackModal(async (text) => {
+                        try {
+                            await DataService.addDocument('feedback', {
+                                text,
+                                userEmail: this.state.user.email,
+                                timestamp: serverTimestamp()
+                            });
+                            DOM.showToast('Feedback enviado com sucesso. Obrigado!');
+                        } catch (error) {
+                            DOM.showToast('Erro ao enviar feedback.', 'error');
+                        }
+                    });
+                });
+            },
+
+            handleConnectionChange() {
+                const statusDiv = DOM.qs('#connection-status');
+                if (navigator.onLine) {
+                    statusDiv.textContent = 'Online';
+                    statusDiv.className = 'online show';
+                    OfflineService.processSyncQueue();
+                } else {
+                    statusDiv.textContent = 'Offline';
+                    statusDiv.className = 'offline show';
+                }
+                setTimeout(() => statusDiv.classList.remove('show'), 3000);
+            },
+            
+            updateNotifications() {
+                const notifications = NotificationService.checkAllNotifications(this.state.data);
+                const badge = DOM.qs('#notification-badge');
+                const panel = DOM.qs('#notification-panel');
+
+                if (!badge || !panel) return;
+
+                if (notifications.length > 0) {
+                    badge.textContent = notifications.length;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+
+                panel.innerHTML = notifications.length > 0 ? notifications.map(n => `
+                    <div class="notification-item flex items-start gap-3" data-notification-id="${n.id}">
+                        <i class="fas ${n.icon} mt-1"></i>
+                        <div>
+                            <p class="font-semibold text-sm">${n.title}</p>
+                            <p class="text-xs text-gray-500">${n.description}</p>
+                        </div>
+                    </div>
+                `).join('') : '<p class="p-4 text-sm text-center text-gray-500">Nenhuma notificação.</p>';
+            },
+
+            async handleGlobalClick(e) {
+                if (!this.state.user) return; 
+
+                const target = e.target;
+                
+                // Ações de Notificação
+                const notificationItem = target.closest('.notification-item');
+                if (notificationItem) {
+                    const id = notificationItem.dataset.notificationId;
+                    const notification = NotificationService.notifications.find(n => n.id === id);
+                    if (notification && notification.action) {
+                        notification.action();
+                        DOM.qs('#notification-panel').classList.add('hidden');
+                    }
+                }
+
+                // Ações do Estoque
+                if (target.closest('#btn-add-peca')) {
+                    Views.Estoque.showNewPieceModal(async (pieceData) => {
+                         try {
+                            await DataService.addDocument('estoque', pieceData);
+                            DOM.showToast('Peça adicionada com sucesso!');
+                        } catch (error) {
+                            DOM.showToast('Erro ao adicionar peça.', 'error');
+                        }
+                    });
+                }
+                
+                const btnDeleteStock = target.closest('.btn-delete-stock');
+                if(btnDeleteStock) {
+                    const id = btnDeleteStock.dataset.id;
+                    ModalService.showConfirmation({
+                        title: 'Excluir Peça',
+                        message: 'Tem certeza que deseja excluir esta peça do estoque?',
+                        onConfirm: async () => {
+                            await DataService.deleteDocument('estoque', id);
+                            DOM.showToast('Peça excluída.');
+                        }
+                    });
+                }
+
+                const btnAddStock = target.closest('.btn-add-stock');
+                if(btnAddStock) {
+                    const id = btnAddStock.dataset.id;
+                    const peca = this.state.data.estoque.find(p => p.id === id);
+                    ModalService.showAddStockModal({ peca, onConfirm: async (quantity) => {
+                        const newQty = peca.qtd + quantity;
+                        await DataService.updateDocument('estoque', id, { qtd: newQty });
+                        DOM.showToast(`${quantity} unidades adicionadas a ${peca.nome}.`);
+                    }});
+                }
+
+                const btnEditStock = target.closest('.btn-edit-stock');
+                if(btnEditStock) {
+                     const id = btnEditStock.dataset.id;
+                     const item = this.state.data.estoque.find(p => p.id === id);
+                     ModalService.showEditStockModal({ item, onConfirm: async (updatedData) => {
+                        await DataService.updateDocument('estoque', id, updatedData);
+                        DOM.showToast('Item atualizado com sucesso!');
+                     }});
+                }
+
+                // Ações de Máscaras de Reserva
+                const btnShowMaskQr = target.closest('.btn-show-mask-qr');
+                if (btnShowMaskQr) {
+                    ModalService.showQRCode({ title: `QR Code de ${btnShowMaskQr.dataset.identificacao}`, data: btnShowMaskQr.dataset.id });
+                }
+
+                const btnShowObservations = target.closest('.btn-show-observations');
+                if (btnShowObservations) {
+                    const maskId = btnShowObservations.dataset.id;
+                    const mask = this.state.data.mascarasReserva.find(m => m.id === maskId);
+                    if (mask) {
+                        ModalService.showMaskObservationsModal({
+                            mask,
+                            onConfirm: async (text) => {
+                                const newObservation = { text, authorEmail: this.state.user.email, timestamp: Timestamp.now() };
+                                await DataService.updateDocument('mascarasReserva', maskId, { observacoes: arrayUnion(newObservation) });
+                                DOM.showToast('Observação adicionada!');
+                                ModalService.close(); 
+                            }
+                        });
+                    }
+                }
+                
+                const btnLoanMask = target.closest('.btn-loan-mask');
+                if (btnLoanMask) {
+                    const maskId = btnLoanMask.dataset.id;
+                    const mask = this.state.data.mascarasReserva.find(m => m.id === maskId);
+                    ModalService.showLoanModal({
+                        mask,
+                        users: this.state.data.usuarios,
+                        onConfirm: async (loanData) => {
+                            const { userId, userName, deliveryDate, returnDate } = loanData;
+                            const obsText = `Emprestado para ${userName}. Devolução em ${returnDate}.`;
+                            await DataService.updateDocument('mascarasReserva', maskId, {
+                                status: 'Em uso',
+                                currentUser: userName,
+                                currentUserId: userId,
+                                observacoes: arrayUnion({ text: obsText, authorEmail: this.state.user.email, timestamp: Timestamp.now() })
+                            });
+                            DOM.showToast('Máscara emprestada!');
+                        }
+                    });
+                }
+                
+                const btnReturnMask = target.closest('.btn-return-mask');
+                if (btnReturnMask) {
+                    const maskId = btnReturnMask.dataset.id;
+                    ModalService.showConfirmation({
+                        title: 'Confirmar Devolução',
+                        message: 'Deseja marcar esta máscara como disponível?',
+                        onConfirm: async () => {
+                            const obsText = `Máscara devolvida ao estoque.`;
+                            await DataService.updateDocument('mascarasReserva', maskId, {
+                                status: 'Disponível',
+                                currentUser: '',
+                                currentUserId: '',
+                                observacoes: arrayUnion({ text: obsText, authorEmail: this.state.user.email, timestamp: Timestamp.now() })
+                            });
+                            DOM.showToast('Máscara devolvida!');
+                        }
+                    });
+                }
+
+                const btnDeleteMask = target.closest('.btn-delete-mask');
+                if (btnDeleteMask) {
+                    const maskId = btnDeleteMask.dataset.id;
+                    ModalService.showConfirmation({
+                        title: 'Excluir Máscara',
+                        message: 'Esta ação é permanente. Deseja continuar?',
+                        onConfirm: async () => {
+                            await DataService.deleteDocument('mascarasReserva', maskId);
+                            DOM.showToast('Máscara excluída.');
+                        }
+                    });
+                }
+
+                // Ações de Usuários
+                const btnShowUserQr = target.closest('.btn-show-user-qr');
+                if(btnShowUserQr){
+                    const { userid, nome } = btnShowUserQr.dataset;
+                    ModalService.showQRCode({ title: `QR Code de ${nome}`, data: userid });
+                }
+
+                const btnDeleteUser = target.closest('.btn-delete-user');
+                if (btnDeleteUser) {
+                    const userId = btnDeleteUser.dataset.userid;
+                    ModalService.showConfirmation({
+                        title: 'Excluir Usuário',
+                        message: 'Tem certeza de que deseja excluir este usuário? Seu histórico será mantido.',
+                        onConfirm: async () => {
+                            try {
+                                // CORREÇÃO: Buscar o documento pelo userId para obter o ID real do Firestore
+                                const usersCollectionRef = collection(db, `artifacts/gcontroledehgutl/public/data/usuarios`);
+                                const q = query(usersCollectionRef, where("userId", "==", userId));
+                                const querySnapshot = await getDocs(q);
+
+                                if (!querySnapshot.empty) {
+                                    const docIdToDelete = querySnapshot.docs[0].id;
+                                    await DataService.deleteDocument('usuarios', docIdToDelete);
+                                    DOM.showToast('Usuário excluído com sucesso.');
+                                } else {
+                                    DOM.showToast('Usuário não encontrado para exclusão.', 'error');
+                                }
+                            } catch (error) {
+                                console.error("Erro ao excluir usuário:", error);
+                                DOM.showToast('Falha ao excluir o usuário.', 'error');
+                            }
+                        }
+                    });
+                }
+
+                 const btnShowUserHistory = target.closest('.btn-show-history');
+                if (btnShowUserHistory) {
+                    const userId = btnShowUserHistory.dataset.userid;
+                    const userName = btnShowUserHistory.dataset.nome;
+                    const userHistory = this.state.data.historico.filter(h => h.userId === userId);
+                    ModalService.showUserHistoryModal({
+                        userName: userName,
+                        history: userHistory,
+                        onExport: () => {
+                             ModalService.showRecipientModal({
+                                title: `Exportar Histórico de ${userName}`,
+                                currentUserEmail: this.state.user.email,
+                                onConfirm: (recipient) => {
+                                    ReportService.generateUserHistoryPdf(userName, userHistory, recipient);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                 const btnEditUser = target.closest('.btn-edit-user');
+                if (btnEditUser) {
+                    const userId = btnEditUser.dataset.userid;
+                    const userToEdit = this.state.data.usuarios.find(u => u.userId === userId);
+                    if (userToEdit) {
+                        ModalService.showEditUserModal({
+                            user: userToEdit,
+                            onConfirm: async (updatedData) => {
+                                // CORREÇÃO: Buscar o documento pelo userId para obter o ID real do Firestore
+                                const usersCollectionRef = collection(db, `artifacts/gcontroledehgutl/public/data/usuarios`);
+                                const q = query(usersCollectionRef, where("userId", "==", userId));
+                                const querySnapshot = await getDocs(q);
+
+                                if (!querySnapshot.empty) {
+                                    const docIdToUpdate = querySnapshot.docs[0].id;
+                                    await DataService.updateDocument('usuarios', docIdToUpdate, updatedData);
+                                    DOM.showToast('Usuário atualizado com sucesso.');
+                                } else {
+                                     DOM.showToast('Usuário não encontrado para atualização.', 'error');
+                                }
+                            }
+                        });
+                    }
+                }
+
+                const scanUserButton = target.closest('#btn-scan-user');
+                if (scanUserButton) {
+                    ModalService.showScanner((scannedId) => {
+                        const user = this.state.data.usuarios.find(u => u.userId === scannedId);
+                        if (user) {
+                            DOM.qs('#search-hig-usuario').value = user.nome;
+                            DOM.qs('#selected-user-id').value = user.userId;
+                            DOM.qs('#hig-tamanho').value = user.tamanhoMascara;
+                            const resultsContainer = DOM.qs('#autocomplete-results');
+                            if(resultsContainer) resultsContainer.classList.add('hidden');
+                            ModalService.close();
+                            DOM.showToast(`Usuário ${user.nome} selecionado!`);
+                        } else {
+                            DOM.showToast('Usuário não encontrado.', 'error');
+                        }
+                    });
+                }
+
+                 const generatePartsOrderButton = target.closest('#btn-generate-parts-order');
+                 if (generatePartsOrderButton) {
+                    ModalService.showRecipientModal({
+                        title: 'Confirmar Destinatário do Pedido',
+                        currentUserEmail: this.state.user.email,
+                        onConfirm: (recipient) => {
+                           const items = [...DOM.qsa('#low-stock-list input[type="number"]')]
+                               .map(input => {
+                                   const id = input.dataset.id;
+                                   const peca = this.state.data.estoque.find(p => p.id === id);
+                                   return { ...peca, qtdSugerida: parseInt(input.value, 10) };
+                               })
+                               .filter(item => item.qtdSugerida > 0);
+                           ReportService.generatePurchaseOrderPdf(items, recipient);
+                        }
+                    });
+                }
+
+                // Ações do Quadro de Avisos
+                const btnNewNotice = target.closest('#btn-new-notice');
+                if (btnNewNotice) {
+                    ModalService.showNewNoticeModal({
+                        users: this.state.data.usuarios,
+                        permissions: this.state.data.permissao,
+                        onConfirm: async (noticeData) => {
+                            await DataService.addDocument('noticeBoard', {
+                                ...noticeData,
+                                createdBy: this.state.user.email,
+                                createdAt: Timestamp.now()
+                            });
+                            DOM.showToast('Aviso criado com sucesso!');
+                        }
+                    });
+                }
+                const btnUpdateNotice = target.closest('.btn-update-notice');
+                if (btnUpdateNotice) {
+                    const noticeId = btnUpdateNotice.dataset.id;
+                    const notice = this.state.data.noticeBoard.find(n => n.id === noticeId);
+                    if(notice) ModalService.showUpdateNoticeModal({ notice, onConfirm: async (data) => {
+                        await DataService.updateDocument('noticeBoard', noticeId, data);
+                        DOM.showToast('Aviso atualizado.');
+                    }});
+                }
+                const btnEditNotice = target.closest('.btn-edit-notice');
+                if (btnEditNotice) {
+                    const noticeId = btnEditNotice.dataset.id;
+                    const notice = this.state.data.noticeBoard.find(n => n.id === noticeId);
+                    if(notice) ModalService.showEditNoticeModal({ notice, onConfirm: async (data) => {
+                        await DataService.updateDocument('noticeBoard', noticeId, data);
+                        DOM.showToast('Aviso editado.');
+                    }});
+                }
+                const btnDeleteNotice = target.closest('.btn-delete-notice');
+                if (btnDeleteNotice) {
+                    const noticeId = btnDeleteNotice.dataset.id;
+                    ModalService.showConfirmation({
+                        title: 'Excluir Aviso?',
+                        message: 'Esta ação não pode ser desfeita.',
+                        onConfirm: async () => {
+                            await DataService.deleteDocument('noticeBoard', noticeId);
+                            DOM.showToast('Aviso excluído.');
+                        }
+                    });
+                }
+
+                // Ações de Relatórios
+                const btnGenerateStockPdf = target.closest('#btn-generate-stock-pdf');
+                if (btnGenerateStockPdf) {
+                    ModalService.showRecipientModal({
+                        title: 'Gerar Relatório de Estoque',
+                        currentUserEmail: this.state.user.email,
+                        onConfirm: (recipient) => ReportService.generateStockPdf(this.state.data.estoque, recipient)
+                    });
+                }
+                const btnGenerateStockExcel = target.closest('#btn-generate-stock-excel');
+                if (btnGenerateStockExcel) {
+                    ReportService.generateStockExcel(this.state.data.estoque);
+                }
+                const btnGenerateUserPdf = target.closest('#btn-generate-user-pdf');
+                if (btnGenerateUserPdf) {
+                    ModalService.showRecipientModal({
+                        title: 'Gerar Relatório de Usuários',
+                        currentUserEmail: this.state.user.email,
+                        onConfirm: (recipient) => ReportService.generateUserReportPdf(this.state.data.usuarios, recipient)
+                    });
+                }
+                const btnGenerateUserExcel = target.closest('#btn-generate-user-excel');
+                if (btnGenerateUserExcel) {
+                    ReportService.generateUserReportExcel(this.state.data.usuarios);
+                }
+                
+                const btnGenerateHigReport = target.closest('.btn-generate-hig-report');
+                if(btnGenerateHigReport) {
+                    const format = btnGenerateHigReport.dataset.format;
+                    ModalService.showRecipientModal({ title: 'Gerar Relatório de Higienização', currentUserEmail: this.state.user.email, onConfirm: (recipient) => {
+                        const filters = {
+                            inicio: DOM.qs('#hig-start-date').value, 
+                            fim: DOM.qs('#hig-end-date').value,
+                            setor: DOM.qs('#hig-setor').value, 
+                            usuario: DOM.qs('#hig-usuario').value, 
+                            status: DOM.qs('#hig-status').value
+                        };
+                        
+                        let filteredData = [...this.state.data.historico];
+
+                        // Filtragem
+                        if (filters.inicio) {
+                            const startDate = new Date(filters.inicio);
+                            filteredData = filteredData.filter(h => h.higienizadoEm.toDate() >= startDate);
+                        }
+                        if (filters.fim) {
+                            const endDate = new Date(filters.fim);
+                            endDate.setHours(23, 59, 59, 999); // Inclui o dia todo
+                            filteredData = filteredData.filter(h => h.higienizadoEm.toDate() <= endDate);
+                        }
+                        if (filters.usuario !== 'Todos') {
+                            filteredData = filteredData.filter(h => h.userName === filters.usuario);
+                        }
+                        if (filters.status === 'Com Danos') {
+                            filteredData = filteredData.filter(h => h.report && h.report.length > 0);
+                        }
+                        if (filters.status === 'Sem Danos') {
+                            filteredData = filteredData.filter(h => !h.report || h.report.length === 0);
+                        }
+                        if (filters.setor !== 'Todos') {
+                            const usersInSector = this.state.data.usuarios
+                                .filter(u => u.setores && u.setores.includes(filters.setor))
+                                .map(u => u.userId);
+                            filteredData = filteredData.filter(h => usersInSector.includes(h.userId));
+                        }
+
+                        if(format === 'pdf') ReportService.generatePdf(filteredData, this.state.data, filters, recipient);
+                        else ReportService.generateExcel(filteredData, this.state.data);
+                    }});
+                }
+
+                // Pedidos Manuais
+                const btnManualParts = target.closest('#btn-manual-parts');
+                if (btnManualParts) {
+                    ModalService.showManualPartsOrderModal({
+                        estoque: this.state.data.estoque,
+                        onConfirm: (items) => {
+                            ModalService.showRecipientModal({
+                                title: 'Destinatário do Pedido de Peças',
+                                currentUserEmail: this.state.user.email,
+                                onConfirm: (recipient) => {
+                                    ReportService.generatePurchaseOrderPdf(items, recipient);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                const btnManualMasks = target.closest('#btn-manual-masks');
+                if (btnManualMasks) {
+                    ModalService.showManualMasksOrderModal({
+                        onConfirm: (items) => {
+                            ModalService.showRecipientModal({
+                                title: 'Destinatário do Pedido de Máscaras',
+                                currentUserEmail: this.state.user.email,
+                                onConfirm: (recipient) => {
+                                    ReportService.generateNewMasksOrderPdf(items, recipient);
+                                }
+                            });
+                        }
+                    });
+                }
+
+                // Filtros de Data
+                const presetDateBtn = target.closest('.preset-date-btn');
+                if (presetDateBtn) {
+                    const preset = presetDateBtn.dataset.preset;
+                    const startDateInput = DOM.qs('#hig-start-date');
+                    const endDateInput = DOM.qs('#hig-end-date');
+                    const today = new Date();
+                    const toISODate = (date) => date.toISOString().split('T')[0];
+
+                    if (preset === 'today') {
+                        startDateInput.value = toISODate(today);
+                        endDateInput.value = toISODate(today);
+                    } else if (preset === 'week') {
+                        const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+                        const lastDayOfWeek = new Date(firstDayOfWeek);
+                        lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
+                        startDateInput.value = toISODate(firstDayOfWeek);
+                        endDateInput.value = toISODate(lastDayOfWeek);
+                    } else if (preset === 'month') {
+                        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                        startDateInput.value = toISODate(firstDayOfMonth);
+                        endDateInput.value = toISODate(lastDayOfMonth);
+                    }
+                }
+                
+                // Permissões
+                const btnEditPermissionName = target.closest('.btn-edit-permission-name');
+                if (btnEditPermissionName) {
+                    const permissionId = btnEditPermissionName.dataset.id;
+                    const permission = this.state.data.permissao.find(p => p.id === permissionId);
+                    if (permission) {
+                        ModalService.showEditPermissionNameModal({
+                            permission: { ...permission, email: this.state.data.userStatus.find(u => u.uid === permissionId)?.email },
+                            onConfirm: async (newName) => {
+                                await DataService.updateDocument('permissao', permissionId, { nome: newName }, 'permissao');
+                                DOM.showToast('Nome associado com sucesso!');
+                            }
+                        });
+                    }
+                }
+                
+                const btnNewSystemUser = target.closest('#btn-new-system-user');
+                if (btnNewSystemUser) {
+                    ModalService.showNewSystemUserModal({
+                        onConfirm: async (userData) => {
+                            try {
+                                // Simula a criação para obter o UID, mas na prática isso seria feito no backend.
+                                // AQUI, vamos apenas adicionar a permissão e avisar o dev.
+                                const tempUserRef = doc(collection(db, "permissao"));
+                                await setDoc(tempUserRef, {
+                                    nome: userData.nome,
+                                    role: userData.role
+                                });
+                                ModalService.close();
+                                ModalService.showConfirmation({
+                                    title: 'Permissão Adicionada',
+                                    message: `A permissão para ${userData.email} foi criada. Agora, você deve criar manualmente este usuário no painel do Firebase Authentication com o mesmo e-mail para que o acesso seja liberado. O ID da permissão é ${tempUserRef.id}`,
+                                    onConfirm: () => {}
+                                });
+                            } catch (error) {
+                                DOM.showToast(AuthService.getFriendlyErrorMessage(error), 'error');
+                            }
+                        }
+                    });
+                }
+            }
+        };
+
+        // =================================================================================
+        // INICIALIZAÇÃO DA APLICAÇÃO
+        // =================================================================================
+        window.addEventListener('load', () => {
+            App.init();
+        });
+
+    </script>
 </body>
 </html>
