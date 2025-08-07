@@ -1,118 +1,277 @@
 // =================================================================================
-// MÓDULO PRINCIPAL DA APLICAÇÃO (App) - PONTO DE ENTRADA
+// APLICAÇÃO PRINCIPAL - S.G.M
 // =================================================================================
-import { AuthService, DataService } from './services.js';
-import { DOM, ModalService, NotificationService, AssistantService, OfflineService, PresenceService, ReportService } from './utils.js';
-import { Views } from './views.js';
-import { auth, db } from './firebase-config.js';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { Timestamp, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+import { auth, db } from './firebase-config.js';
+import { DataService } from './services.js';
+import { 
+    DOM, 
+    getUserStatus, 
+    PresenceService, 
+    AuthService, 
+    OfflineService, 
+    NotificationService, 
+    AssistantService, 
+    ModalService, 
+    ReportService 
+} from './utils.js';
+import { Views } from './views.js';
+
+// Torna os serviços disponíveis globalmente para compatibilidade
+window.DOM = DOM;
+window.OfflineService = OfflineService;
+window.DataService = DataService;
+
+// =================================================================================
+// APLICAÇÃO PRINCIPAL
+// =================================================================================
 const App = {
     state: {
         user: null,
-        currentView: 'Dashboard',
         data: {
-            usuarios: [], estoque: [], historico: [], mascarasReserva: [],
-            noticeBoard: [], permissao: [], userStatus: []
+            usuarios: [],
+            estoque: [],
+            historico: [],
+            mascarasReserva: [],
+            noticeBoard: [],
+            userStatus: [],
+            permissao: []
         },
-        listeners: [],
+        listeners: {},
+        currentView: 'Dashboard',
         isDataLoaded: false
     },
 
-    init() {
-        DOM.render('#app', '<div class="flex items-center justify-center h-screen"><i class="fas fa-spinner fa-spin text-blue-500 text-4xl"></i></div>');
-        DOM.qs('#footer-text').textContent = `S.G.M © ${new Date().getFullYear()}`;
-        DOM.toggleFabs(false);
+    async init() {
+        console.log('🚀 Iniciando S.G.M...');
+        
+        // Inicializar serviços
         OfflineService.init();
+        AssistantService.initSpeechRecognition();
+        
+        // Configurar listeners
+        this.setupAuthListener();
         this.addEventListeners();
+        
+        // Verificar status de conexão inicial
         this.handleConnectionChange();
-        AuthService.listenToAuthChanges(this.onAuthStateChange.bind(this));
-    },
-
-    async onAuthStateChange(user) {
-        if (this.state.user && !user) { 
-            this.state.listeners.forEach(unsubscribe => unsubscribe());
-            this.state.listeners = [];
-            if(Views.Dashboard && Views.Dashboard.stopAutoUpdate) Views.Dashboard.stopAutoUpdate();
-            PresenceService.stop();
-        }
         
-        this.state.user = user;
-        
-        if (user) {
-            Views.AppLayout.render(user);
-            this.attachMainAppEventListeners();
-            await this.loadInitialData();
-            PresenceService.init();
-            NotificationService.requestPermission();
-            DOM.toggleFabs(true);
-        } else {
-            Views.Auth.render();
-            DOM.toggleFabs(false);
-        }
+        console.log('✅ S.G.M iniciado com sucesso!');
     },
 
-    async loadInitialData() {
-        await this.loadDataFromCache();
-        this.setupFirebaseListeners();
-    },
-
-    async loadDataFromCache() {
-        const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'permissao'];
-        for (const name of collections) {
-            this.state.data[name] = await OfflineService.getCollection(name);
-        }
-        this.state.isDataLoaded = true;
-        this.renderCurrentView();
-    },
-    
-    setupFirebaseListeners() {
-        const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'permissao', 'userStatus'];
-        collections.forEach(name => {
-            const unsubscribe = DataService.listenToCollection(name, (data) => {
-                this.state.data[name] = data;
-                if(this.state.isDataLoaded) {
-                    this.updateNotifications();
-                    if(!(name === 'userStatus' && this.state.currentView === 'Cadastros')) {
-                        this.renderCurrentView();
-                    }
-                }
-            });
-            this.state.listeners.push(unsubscribe);
+    setupAuthListener() {
+        AuthService.listenToAuthChanges((user) => {
+            if (user) {
+                this.state.user = user;
+                this.onUserLogin();
+            } else {
+                this.state.user = null;
+                this.onUserLogout();
+            }
         });
     },
 
-    renderCurrentView(params = {}) {
-        const viewName = this.state.currentView;
-        const view = Views[viewName]; 
-        if (view && typeof view.render === 'function') {
-            DOM.qsa('.nav-tab').forEach(tab => tab.classList.remove('active'));
-            const activeTab = DOM.qs(`.nav-tab[data-view="${viewName}"]`);
-            if (activeTab) activeTab.classList.add('active');
+    async onUserLogin() {
+        console.log('👤 Usuário logado:', this.state.user.email);
+        
+        // Inicializar serviços que precisam de autenticação
+        PresenceService.init();
+        await NotificationService.requestPermission();
+        
+        // Configurar listeners de dados
+        this.setupDataListeners();
+        
+        // Renderizar interface principal
+        this.renderMainInterface();
+        this.attachMainAppEventListeners();
+        
+        // Mostrar FABs
+        DOM.toggleFabs(true);
+    },
+
+    onUserLogout() {
+        console.log('👤 Usuário deslogado');
+        
+        // Parar serviços
+        PresenceService.stop();
+        this.stopDataListeners();
+        
+        // Esconder FABs
+        DOM.toggleFabs(false);
+        
+        // Renderizar tela de login
+        this.renderLoginScreen();
+    },
+
+    setupDataListeners() {
+        const collections = ['usuarios', 'estoque', 'historico', 'mascarasReserva', 'noticeBoard', 'userStatus', 'permissao'];
+        
+        collections.forEach(collectionName => {
+            this.state.listeners[collectionName] = DataService.listenToCollection(
+                collectionName, 
+                (data) => {
+                    this.state.data[collectionName] = data;
+                    this.onDataUpdate();
+                }
+            );
+        });
+    },
+
+    stopDataListeners() {
+        Object.values(this.state.listeners).forEach(unsubscribe => {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        });
+        this.state.listeners = {};
+    },
+
+    onDataUpdate() {
+        // Verificar se todos os dados foram carregados pelo menos uma vez
+        const requiredCollections = ['usuarios', 'estoque', 'historico'];
+        const isLoaded = requiredCollections.every(col => this.state.data[col].length >= 0);
+        
+        if (isLoaded && !this.state.isDataLoaded) {
+            this.state.isDataLoaded = true;
+            console.log('📊 Dados iniciais carregados');
+        }
+        
+        // Atualizar notificações
+        this.updateNotifications();
+        
+        // Re-renderizar view atual se necessário
+        this.renderCurrentView();
+    },
+
+    renderLoginScreen() {
+        DOM.render('#app', `
+            <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+                <div class="max-w-md w-full space-y-8">
+                    <div>
+                        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                            S.G.M
+                        </h2>
+                        <p class="mt-2 text-center text-sm text-gray-600">
+                            Sistema de Gestão de Máscaras
+                        </p>
+                    </div>
+                    <form id="login-form" class="mt-8 space-y-6">
+                        <div id="login-error" class="text-red-600 text-sm text-center"></div>
+                        <div class="rounded-md shadow-sm -space-y-px">
+                            <div>
+                                <input id="email" name="email" type="email" autocomplete="email" required 
+                                       class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                                       placeholder="Email">
+                            </div>
+                            <div>
+                                <input id="password" name="password" type="password" autocomplete="current-password" required 
+                                       class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+                                       placeholder="Senha">
+                            </div>
+                        </div>
+                        <div>
+                            <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <span id="btn-login-spinner" class="hidden">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                                </span>
+                                Entrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `);
+    },
+
+    renderMainInterface() {
+        DOM.render('#app', `
+            <div id="sticky-header" class="bg-gray-50 border-b border-gray-200">
+                <header class="mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between items-center py-6">
+                        <div class="flex items-center">
+                            <h1 class="text-2xl font-bold text-gray-900">S.G.M</h1>
+                            <span class="ml-3 text-sm text-gray-500">Sistema de Gestão de Máscaras</span>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div id="notification-bell" class="relative">
+                                <i class="fas fa-bell text-xl text-gray-600 hover:text-gray-800 cursor-pointer"></i>
+                                <span id="notification-badge" class="hidden"></span>
+                                <div id="notification-panel" class="hidden"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">Olá, ${this.state.user.email}</span>
+                            <button id="logoutButton" class="text-sm text-red-600 hover:text-red-800">Sair</button>
+                        </div>
+                    </div>
+                </header>
+                
+                <nav class="border-t border-gray-200">
+                    <div class="mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="flex space-x-8 overflow-x-auto tabs">
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Dashboard">Dashboard</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Higienizacao">Higienização</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Cadastros">Cadastros</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Estoque">Estoque</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="MascarasReserva">Máscaras Reserva</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Relatorios">Relatórios</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Pedidos">Pedidos</button>
+                            <button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="QuadroDeAvisos">Quadro de Avisos</button>
+                            ${this.state.user.role === 'desenvolvedor' ? '<button class="nav-tab py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap" data-view="Permissoes">Permissões</button>' : ''}
+                        </div>
+                    </div>
+                </nav>
+            </div>
             
+            <main class="flex-1 overflow-auto">
+                <div id="view-content" class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 fade-in">
+                    <!-- Conteúdo da view atual será renderizado aqui -->
+                </div>
+            </main>
+        `);
+        
+        this.renderCurrentView();
+        this.updateActiveTab();
+    },
+
+    renderCurrentView(params = {}) {
+        if (!this.state.isDataLoaded) {
+            DOM.render('#view-content', `
+                <div class="flex items-center justify-center py-12">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-600">Carregando dados...</p>
+                    </div>
+                </div>
+            `);
+            return;
+        }
+
+        const view = Views[this.state.currentView];
+        if (view && typeof view.render === 'function') {
             view.render(this.state.data, this.state.user, params);
         } else {
-            console.error(`View ${viewName} não encontrada ou não tem método render.`);
-            DOM.render('#view-content', `<div class="p-6 bg-red-100 text-red-700 rounded-lg">
-                <h2 class="font-bold">Erro de Carregamento</h2>
-                <p>A visualização solicitada ('${viewName}') não foi encontrada ou não pôde ser renderizada. Por favor, contate o suporte.</p>
-            </div>`);
+            DOM.render('#view-content', `
+                <div class="text-center py-12">
+                    <i class="fas fa-construction text-4xl text-gray-400 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Em Desenvolvimento</h3>
+                    <p class="text-gray-600">Esta funcionalidade está sendo desenvolvida.</p>
+                </div>
+            `);
         }
     },
 
+    updateActiveTab() {
+        DOM.qsa('.nav-tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.dataset.view === this.state.currentView) {
+                tab.classList.add('active');
+            }
+        });
+    },
+
     onNavigate(viewName, params = {}) {
-        if (Views.Dashboard && typeof Views.Dashboard.stopAutoUpdate === 'function') {
-            Views.Dashboard.stopAutoUpdate();
-        }
-        // Reset page to 1 when navigating to user management
-        if (viewName === 'GestaoUsuarios') {
-            Views.GestaoUsuarios.currentPage = 1;
-        }
         this.state.currentView = viewName;
         this.renderCurrentView(params);
+        this.updateActiveTab();
     },
-    
+
     addEventListeners() {
         window.addEventListener('online', this.handleConnectionChange.bind(this));
         window.addEventListener('offline', this.handleConnectionChange.bind(this));
@@ -120,66 +279,9 @@ const App = {
         document.body.addEventListener('change', this.handleGlobalChange.bind(this));
         document.body.addEventListener('submit', this.handleGlobalSubmit.bind(this));
     },
-    
+
     handleGlobalChange(e) {
-        if (e.target.matches('.role-select')) {
-            const select = e.target;
-            const uid = select.dataset.uid;
-            const newRole = select.value;
-            const originalPermission = this.state.data.permissao.find(p => p.id === uid);
-            const originalRole = originalPermission.role;
-
-            const currentUser = this.state.user;
-
-            // Regras de permissão
-            if (currentUser.role === 'desenvolvedor' && currentUser.uid !== uid) {
-                DOM.showToast('Desenvolvedores só podem alterar o próprio cargo.', 'error');
-                select.value = originalRole;
-                return;
-            }
-
-            if (currentUser.role === 'administrador') {
-                if (newRole === 'desenvolvedor') {
-                    DOM.showToast('Administradores não podem designar desenvolvedores.', 'error');
-                    select.value = originalRole;
-                    return;
-                }
-                if (originalRole === 'desenvolvedor') {
-                    DOM.showToast('Administradores não podem alterar o cargo de desenvolvedores.', 'error');
-                    select.value = originalRole;
-                    return;
-                }
-            }
-
-            select.disabled = true;
-
-            ModalService.showConfirmation({
-                title: 'Confirmar Alteração de Cargo',
-                message: `Deseja realmente alterar o cargo deste usuário para ${newRole}?`,
-                onConfirm: async () => {
-                    try {
-                        await DataService.updateDocument('permissao', uid, { role: newRole }, 'permissao');
-                        DOM.showToast('Cargo atualizado com sucesso!', 'success');
-                    } catch (error) {
-                        console.error("Erro ao atualizar cargo:", error);
-                        DOM.showToast('Falha ao atualizar o cargo.', 'error');
-                        select.value = originalRole;
-                    } finally {
-                        select.disabled = false;
-                    }
-                },
-            });
-             
-            const modal = DOM.qs('#confirmationModal');
-            if (modal) {
-                modal.addEventListener('click', (ev) => {
-                    if (ev.target.id === 'modal-btn-cancel' || !modal.contains(ev.target)) {
-                        select.value = originalRole;
-                        select.disabled = false;
-                    }
-                });
-            }
-        }
+        // Implementar handlers de mudança aqui se necessário
     },
 
     handleGlobalSubmit(e) {
@@ -208,7 +310,6 @@ const App = {
             this.onNavigate('Estoque', { searchTerm });
         }
         if (e.target.id === 'search-form-users') {
-            Views.GestaoUsuarios.currentPage = 1; // Reset page on new search
             const searchTerm = DOM.qs('#search-input-users').value;
             this.onNavigate('GestaoUsuarios', { searchTerm });
         }
@@ -222,97 +323,6 @@ const App = {
         if (e.target.id === 'user-registration-form') {
             this.handleUserRegistration(e);
         }
-    },
-
-    attachMainAppEventListeners() {
-        const appContainer = DOM.qs('#app');
-        if (!appContainer) return;
-
-        appContainer.addEventListener('click', (e) => {
-            const target = e.target;
-            
-            if (target.closest('#logoutButton')) {
-                PresenceService.updateStatus('offline');
-                AuthService.signOut();
-            }
-            
-            const navTab = target.closest('.nav-tab');
-            if (navTab) this.onNavigate(navTab.dataset.view);
-
-            const btnVerifyMask = target.closest('#btn-verify-mask');
-            if (btnVerifyMask) {
-                ModalService.showMaskVerificationScanner({
-                    getLocalData: async () => ({
-                        mascaras: await OfflineService.getCollection('mascarasReserva'),
-                        usuarios: await OfflineService.getCollection('usuarios'),
-                        historico: await OfflineService.getCollection('historico')
-                    })
-                });
-            }
-
-            const notificationBell = target.closest('#notification-bell');
-            if (notificationBell) {
-                const panel = DOM.qs('#notification-panel');
-                if (panel) panel.classList.toggle('hidden');
-            }
-        });
-
-        DOM.qs('#assistant-fab').addEventListener('click', () => {
-            ModalService.showAssistant(AssistantService.processCommand.bind(AssistantService));
-        });
-        
-        DOM.qs('#btn-feedback').addEventListener('click', () => {
-             ModalService.showFeedbackModal(async (text) => {
-                try {
-                    await DataService.addDocument('feedback', {
-                        text,
-                        userEmail: this.state.user.email,
-                        timestamp: serverTimestamp()
-                    });
-                    DOM.showToast('Feedback enviado com sucesso. Obrigado!');
-                } catch (error) {
-                    DOM.showToast('Erro ao enviar feedback.', 'error');
-                }
-            });
-        });
-    },
-
-    handleConnectionChange() {
-        const statusDiv = DOM.qs('#connection-status');
-        if (navigator.onLine) {
-            statusDiv.textContent = 'Online';
-            statusDiv.className = 'online show';
-            OfflineService.processSyncQueue();
-        } else {
-            statusDiv.textContent = 'Offline';
-            statusDiv.className = 'offline show';
-        }
-        setTimeout(() => statusDiv.classList.remove('show'), 3000);
-    },
-    
-    updateNotifications() {
-        const notifications = NotificationService.checkAllNotifications(this.state.data);
-        const badge = DOM.qs('#notification-badge');
-        const panel = DOM.qs('#notification-panel');
-
-        if (!badge || !panel) return;
-
-        if (notifications.length > 0) {
-            badge.textContent = notifications.length;
-            badge.classList.remove('hidden');
-        } else {
-            badge.classList.add('hidden');
-        }
-
-        panel.innerHTML = notifications.length > 0 ? notifications.map(n => `
-            <div class="notification-item flex items-start gap-3" data-notification-id="${n.id}">
-                <i class="fas ${n.icon} mt-1"></i>
-                <div>
-                    <p class="font-semibold text-sm">${n.title}</p>
-                    <p class="text-xs text-gray-500">${n.description}</p>
-                </div>
-            </div>
-        `).join('') : '<p class="p-4 text-sm text-center text-gray-500">Nenhuma notificação.</p>';
     },
 
     async handleGlobalClick(e) {
@@ -361,6 +371,80 @@ const App = {
         if (target.matches('.btn-mask-order') || target.closest('.btn-mask-order')) {
             this.handleMaskOrder();
         }
+    },
+
+    attachMainAppEventListeners() {
+        const appContainer = DOM.qs('#app');
+        if (!appContainer) return;
+
+        appContainer.addEventListener('click', (e) => {
+            const target = e.target;
+            
+            if (target.closest('#logoutButton')) AuthService.signOut();
+            
+            const navTab = target.closest('.nav-tab');
+            if (navTab) this.onNavigate(navTab.dataset.view);
+
+            const notificationBell = target.closest('#notification-bell');
+            if (notificationBell) {
+                const panel = DOM.qs('#notification-panel');
+                if (panel) panel.classList.toggle('hidden');
+            }
+        });
+
+        const assistantFab = DOM.qs('#assistant-fab');
+        if (assistantFab) {
+            assistantFab.addEventListener('click', () => {
+                ModalService.showAssistant(AssistantService.processCommand.bind(AssistantService));
+            });
+        }
+        
+        const feedbackBtn = DOM.qs('#btn-feedback');
+        if (feedbackBtn) {
+            feedbackBtn.addEventListener('click', () => {
+                DOM.showToast('Funcionalidade de feedback em desenvolvimento', 'info');
+            });
+        }
+    },
+
+    handleConnectionChange() {
+        const statusDiv = DOM.qs('#connection-status');
+        if (navigator.onLine) {
+            statusDiv.textContent = 'Online';
+            statusDiv.className = 'online show';
+            if (OfflineService.processSyncQueue) {
+                OfflineService.processSyncQueue();
+            }
+        } else {
+            statusDiv.textContent = 'Offline';
+            statusDiv.className = 'offline show';
+        }
+        setTimeout(() => statusDiv.classList.remove('show'), 3000);
+    },
+    
+    updateNotifications() {
+        const notifications = NotificationService.checkAllNotifications(this.state.data);
+        const badge = DOM.qs('#notification-badge');
+        const panel = DOM.qs('#notification-panel');
+
+        if (!badge || !panel) return;
+
+        if (notifications.length > 0) {
+            badge.textContent = notifications.length;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+
+        panel.innerHTML = notifications.length > 0 ? notifications.map(n => `
+            <div class="notification-item flex items-start gap-3" data-notification-id="${n.id}">
+                <i class="fas ${n.icon} mt-1"></i>
+                <div>
+                    <p class="font-semibold text-sm">${n.title}</p>
+                    <p class="text-xs text-gray-500">${n.description}</p>
+                </div>
+            </div>
+        `).join('') : '<p class="p-4 text-sm text-center text-gray-500">Nenhuma notificação.</p>';
     },
 
     handleHygieneSubmit(e) {
